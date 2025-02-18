@@ -1,4 +1,4 @@
-[![Rust](https://github.com/Zitronenjoghurt/lemon-gb/actions/workflows/test.yml/badge.svg)](https://github.com/Zitronenjoghurt/lemon-gb/actions/workflows/test.yml)
+[![Rust](https://github.com/Zitronenjoghurt/lemon-gb/actions/workflows/test.yaml/badge.svg)](https://github.com/Zitronenjoghurt/lemon-gb/actions/workflows/test.yaml)
 [![codecov](https://codecov.io/gh/Zitronenjoghurt/lemon-gb/graph/badge.svg?token=UM6T22YO17)](https://codecov.io/gh/Zitronenjoghurt/lemon-gb)
 ![](https://tokei.rs/b1/github/Zitronenjoghurt/lemon-gb?category=code&type=Rust&logo=https://simpleicons.org/icons/rust.svg)
 
