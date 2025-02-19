@@ -1,5 +1,7 @@
+use crate::hardware::registers::builder::RegistersBuilder;
 use crate::hardware::registers::flags_register::FlagsRegister;
 
+mod builder;
 pub mod flags_register;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
@@ -15,6 +17,10 @@ pub struct Registers {
 }
 
 impl Registers {
+    pub fn builder() -> RegistersBuilder {
+        RegistersBuilder::new()
+    }
+
     pub fn get_a(&self) -> u8 {
         self.a
     }
@@ -59,16 +65,32 @@ impl Registers {
         self.f.into()
     }
 
+    pub fn get_f_zero(&self) -> bool {
+        self.f.get_zero()
+    }
+
     pub fn set_f_zero(&mut self, value: bool) {
         self.f.set_zero(value);
+    }
+
+    pub fn get_f_subtract(&self) -> bool {
+        self.f.get_subtract()
     }
 
     pub fn set_f_subtract(&mut self, value: bool) {
         self.f.set_subtract(value);
     }
 
+    pub fn get_f_half_carry(&self) -> bool {
+        self.f.get_half_carry()
+    }
+
     pub fn set_f_half_carry(&mut self, value: bool) {
         self.f.set_half_carry(value);
+    }
+
+    pub fn get_f_carry(&self) -> bool {
+        self.f.get_carry()
     }
 
     pub fn set_f_carry(&mut self, value: bool) {
