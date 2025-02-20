@@ -1,5 +1,7 @@
+use crate::enums::parameter_groups::{JumpCondition, R16, R8};
 use crate::game_boy::components::cpu::registers::builder::CPURegistersBuilder;
 use crate::game_boy::components::cpu::registers::flags_register::CPUFlagsRegister;
+use crate::game_boy::components::mmu::MMU;
 use crate::helpers::bit_operations::{construct_u16, deconstruct_u16};
 
 pub mod builder;
@@ -40,6 +42,37 @@ impl CpuRegistersAccessTrait for CPURegisters {
 pub trait CpuRegistersAccessTrait {
     fn get_registers(&self) -> &CPURegisters;
     fn get_registers_mut(&mut self) -> &mut CPURegisters;
+
+    fn get_r8(&self, register: R8, mmu: &MMU) -> u8 {
+        match register {
+            R8::B => self.get_b(),
+            R8::C => self.get_c(),
+            R8::D => self.get_d(),
+            R8::E => self.get_e(),
+            R8::H => self.get_h(),
+            R8::L => self.get_l(),
+            R8::HL => mmu.read(self.get_hl()),
+            R8::A => self.get_a(),
+        }
+    }
+
+    fn set_r16(&mut self, register: R16, value: u16) {
+        match register {
+            R16::BC => self.set_bc(value),
+            R16::DE => self.set_de(value),
+            R16::HL => self.set_hl(value),
+            R16::SP => self.set_sp(value),
+        }
+    }
+
+    fn check_jump_condition(&self, condition: JumpCondition) -> bool {
+        match condition {
+            JumpCondition::NotZero => !self.get_f_zero(),
+            JumpCondition::Zero => self.get_f_zero(),
+            JumpCondition::NotCarry => !self.get_f_carry(),
+            JumpCondition::Carry => self.get_f_carry(),
+        }
+    }
 
     fn get_a(&self) -> u8 {
         self.get_registers().a
@@ -157,6 +190,16 @@ pub trait CpuRegistersAccessTrait {
         let (c, b) = deconstruct_u16(value);
         self.set_c(c);
         self.set_b(b);
+    }
+
+    fn get_de(&self) -> u16 {
+        construct_u16(self.get_e(), self.get_d())
+    }
+
+    fn set_de(&mut self, value: u16) {
+        let (e, d) = deconstruct_u16(value);
+        self.set_e(e);
+        self.set_d(d);
     }
 
     fn get_hl(&self) -> u16 {

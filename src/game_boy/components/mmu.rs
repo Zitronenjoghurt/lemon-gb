@@ -1,4 +1,5 @@
 use crate::game_boy::components::mmu::builder::MMUBuilder;
+use crate::helpers::bit_operations::construct_u16;
 
 mod builder;
 
@@ -14,6 +15,12 @@ impl MMU {
 
     pub fn read(&self, address: u16) -> u8 {
         self.memory[address as usize]
+    }
+
+    pub fn read_16(&self, address: u16) -> u16 {
+        let lsb = self.read(address);
+        let msb = self.read(address.wrapping_add(1));
+        construct_u16(lsb, msb)
     }
 
     pub fn write(&mut self, address: u16, value: u8) {

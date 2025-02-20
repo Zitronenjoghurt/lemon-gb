@@ -4,6 +4,49 @@ use crate::game_boy::components::cpu::CPU;
 use crate::game_boy::components::mmu::MMU;
 use rstest::rstest;
 
+/// NOP (0x00)
+#[test]
+fn test_nop() {
+    let mut mmu = MMU::builder().set(0, 0x00).build();
+    let mut cpu = CPU::default();
+
+    let m = cpu.step(&mut mmu);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(m, 1);
+}
+
+/// LOAD r16 imm16
+#[rstest]
+#[case::bc_load(0x01, 0x37, 0x13, 0x1337)]
+#[case::de_load(0x11, 0x37, 0x13, 0x1337)]
+#[case::hl_load(0x21, 0x37, 0x13, 0x1337)]
+#[case::sp_load(0x31, 0x37, 0x13, 0x1337)]
+fn test_ld_r16_imm16(
+    #[case] opcode: u8,
+    #[case] imm1: u8,
+    #[case] imm2: u8,
+    #[case] expected_value: u16,
+) {
+    let mut mmu = MMU::builder()
+        .set(0, opcode)
+        .set(1, imm1)
+        .set(2, imm2)
+        .build();
+    let mut cpu = CPU::default();
+    let m = cpu.step(&mut mmu);
+
+    match opcode {
+        0x01 => assert_eq!(cpu.get_bc(), expected_value),
+        0x11 => assert_eq!(cpu.get_de(), expected_value),
+        0x21 => assert_eq!(cpu.get_hl(), expected_value),
+        0x31 => assert_eq!(cpu.get_sp(), expected_value),
+        _ => panic!("unexpected opcode"),
+    }
+
+    assert_eq!(cpu.get_pc(), 3);
+    assert_eq!(m, 3);
+}
+
 /// ADD register (B, C, D, E, H, L)
 #[rstest]
 // Tests for ADD B (0x80)
@@ -185,12 +228,12 @@ fn test_add_a(
     assert_eq!(m, 2);
 }
 
-/// JUMP IMM (0xC3)
+/// JUMP imm16 (0xC3)
 #[rstest]
 #[case::basic_jump(0x11, 0x22, 0x2211)]
 #[case::jump_to_start(0, 0, 0)]
 #[case::jump_to_end(0xFF, 0xFF, 0xFFFF)]
-fn test_jump_imm(#[case] imm1: u8, #[case] imm2: u8, #[case] expected_pc: u16) {
+fn test_jump_imm16(#[case] imm1: u8, #[case] imm2: u8, #[case] expected_pc: u16) {
     let mut mmu = MMU::builder()
         .set(0, 0xC3)
         .set(1, imm1)
@@ -203,7 +246,7 @@ fn test_jump_imm(#[case] imm1: u8, #[case] imm2: u8, #[case] expected_pc: u16) {
     assert_eq!(m, 4);
 }
 
-/// JUMP COND IMM
+/// JUMP COND imm16
 #[rstest]
 #[case::nz_jump(0xC2, 0x34, 0x12, false, false, 0x1234, 4)]
 #[case::nz_no_jump(0xC2, 0x34, 0x12, true, false, 3, 3)]
@@ -213,7 +256,7 @@ fn test_jump_imm(#[case] imm1: u8, #[case] imm2: u8, #[case] expected_pc: u16) {
 #[case::nc_no_jump(0xD2, 0x34, 0x12, false, true, 3, 3)]
 #[case::c_jump(0xDA, 0x34, 0x12, false, true, 0x1234, 4)]
 #[case::c_no_jump(0xDA, 0x34, 0x12, false, false, 3, 3)]
-fn test_jump_cond_imm(
+fn test_jump_cond_imm16(
     #[case] opcode: u8,
     #[case] imm1: u8,
     #[case] imm2: u8,
