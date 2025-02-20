@@ -1,9 +1,9 @@
-use crate::hardware::registers::flags_register::FlagsRegister;
-use crate::hardware::registers::Registers;
+use crate::game_boy::components::cpu::registers::flags_register::CPUFlagsRegister;
+use crate::game_boy::components::cpu::registers::{CPURegisters, CpuRegistersAccessTrait};
 
 #[test]
 fn test_flag_registers() {
-    let mut test1 = FlagsRegister::default();
+    let mut test1 = CPUFlagsRegister::default();
     assert!(!test1.get_zero());
     assert!(!test1.get_subtract());
     assert!(!test1.get_half_carry());
@@ -19,14 +19,14 @@ fn test_flag_registers() {
     assert!(test1.get_carry());
     assert_eq!(u8::from(test1), 0b1111_0000);
 
-    let test2 = FlagsRegister::from(0b1010_0000);
+    let test2 = CPUFlagsRegister::from(0b1010_0000);
     assert!(test2.get_zero());
     assert!(!test2.get_subtract());
     assert!(test2.get_half_carry());
     assert!(!test2.get_carry());
     assert_eq!(u8::from(test2), 0b1010_0000);
 
-    let mut test3 = FlagsRegister::from(0b0101_1101);
+    let mut test3 = CPUFlagsRegister::from(0b0101_1101);
     assert!(!test3.get_zero());
     assert!(test3.get_subtract());
     assert!(!test3.get_half_carry());
@@ -40,7 +40,7 @@ fn test_flag_registers() {
 
 #[test]
 fn test_bc() {
-    let mut registers = Registers::default();
+    let mut registers = CPURegisters::default();
     assert_eq!(registers.get_b(), 0);
     assert_eq!(registers.get_c(), 0);
 

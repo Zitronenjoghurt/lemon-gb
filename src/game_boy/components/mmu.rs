@@ -1,9 +1,17 @@
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct MemoryBus {
+use crate::game_boy::components::mmu::builder::MMUBuilder;
+
+mod builder;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MMU {
     memory: [u8; 0xFFFF],
 }
 
-impl MemoryBus {
+impl MMU {
+    pub fn builder() -> MMUBuilder {
+        MMUBuilder::new()
+    }
+
     pub fn read(&self, address: u16) -> u8 {
         self.memory[address as usize]
     }
@@ -13,7 +21,7 @@ impl MemoryBus {
     }
 }
 
-impl Default for MemoryBus {
+impl Default for MMU {
     fn default() -> Self {
         Self {
             memory: [0; 0xFFFF],

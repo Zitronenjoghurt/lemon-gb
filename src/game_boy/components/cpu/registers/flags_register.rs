@@ -4,7 +4,7 @@ const HALF_CARRY_FLAG: u8 = 0b0010_0000;
 const CARRY_FLAG: u8 = 0b0001_0000;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
-pub struct FlagsRegister {
+pub struct CPUFlagsRegister {
     /// Set to true if the result of the operation is equal to 0
     zero: bool,
     /// Set to true if the operation was a subtraction
@@ -15,7 +15,7 @@ pub struct FlagsRegister {
     carry: bool,
 }
 
-impl FlagsRegister {
+impl CPUFlagsRegister {
     pub fn get_zero(&self) -> bool {
         self.zero
     }
@@ -49,8 +49,8 @@ impl FlagsRegister {
     }
 }
 
-impl From<FlagsRegister> for u8 {
-    fn from(value: FlagsRegister) -> Self {
+impl From<CPUFlagsRegister> for u8 {
+    fn from(value: CPUFlagsRegister) -> Self {
         (if value.zero { ZERO_FLAG } else { 0 })
             | (if value.subtract { SUBTRACT_FLAG } else { 0 })
             | (if value.half_carry { HALF_CARRY_FLAG } else { 0 })
@@ -58,7 +58,7 @@ impl From<FlagsRegister> for u8 {
     }
 }
 
-impl From<u8> for FlagsRegister {
+impl From<u8> for CPUFlagsRegister {
     fn from(value: u8) -> Self {
         Self {
             zero: (value & ZERO_FLAG) != 0,

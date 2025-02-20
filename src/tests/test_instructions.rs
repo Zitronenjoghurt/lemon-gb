@@ -1,13 +1,8 @@
-use crate::hardware::cpu::memory_bus::MemoryBus;
-use crate::hardware::cpu::Cpu;
-use crate::hardware::registers::Registers;
+use crate::game_boy::components::cpu::registers::builder::CPURegistersBuilderTrait;
+use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
+use crate::game_boy::components::cpu::CPU;
+use crate::game_boy::components::mmu::MMU;
 use rstest::rstest;
-
-fn memory_opc(opcode: u8) -> MemoryBus {
-    let mut memory = MemoryBus::default();
-    memory.write(0, opcode);
-    memory
-}
 
 /// ADD register (B, C, D, E, H, L)
 #[rstest]
@@ -99,7 +94,8 @@ fn test_add_register(
     #[case] expected_hc: bool,
     #[case] expected_c: bool,
 ) {
-    let reg = Registers::builder()
+    let mut mmu = MMU::builder().set(0, opcode).build();
+    let mut cpu = CPU::builder()
         .a(a)
         .b(if opcode == 0x80 { value } else { 0 })
         .c(if opcode == 0x81 { value } else { 0 })
@@ -108,9 +104,8 @@ fn test_add_register(
         .h(if opcode == 0x84 { value } else { 0 })
         .l(if opcode == 0x85 { value } else { 0 })
         .build();
-    let memory = memory_opc(opcode);
-    let mut cpu = Cpu::builder().registers(reg).memory(memory).build();
-    let m = cpu.step();
+
+    let m = cpu.step(&mut mmu);
 
     assert_eq!(cpu.get_registers().get_a(), expected_a);
     assert_eq!(cpu.get_registers().get_f_zero(), expected_z);
@@ -144,14 +139,11 @@ fn test_add_hl(
     #[case] expected_hc: bool,
     #[case] expected_c: bool,
 ) {
-    let address = 0xAB;
+    const ADDRESS: u16 = 0xAB;
 
-    let mut memory = memory_opc(0x86);
-    memory.write(address, value);
-
-    let reg = Registers::builder().a(a).hl(0xAB).build();
-    let mut cpu = Cpu::builder().registers(reg).memory(memory).build();
-    let m = cpu.step();
+    let mut mmu = MMU::builder().set(0, 0x86).set(ADDRESS, value).build();
+    let mut cpu = CPU::builder().a(a).hl(ADDRESS).build();
+    let m = cpu.step(&mut mmu);
 
     assert_eq!(cpu.get_registers().get_a(), expected_a);
     assert_eq!(cpu.get_registers().get_f_zero(), expected_z);
@@ -180,10 +172,9 @@ fn test_add_a(
     #[case] expected_hc: bool,
     #[case] expected_c: bool,
 ) {
-    let reg = Registers::builder().a(a).build();
-    let memory = memory_opc(0x87);
-    let mut cpu = Cpu::builder().registers(reg).memory(memory).build();
-    let m = cpu.step();
+    let mut mmu = MMU::builder().set(0, 0x87).build();
+    let mut cpu = CPU::builder().a(a).build();
+    let m = cpu.step(&mut mmu);
 
     assert_eq!(cpu.get_registers().get_a(), expected_a);
     assert_eq!(cpu.get_registers().get_f_zero(), expected_z);
@@ -213,13 +204,13 @@ fn test_jump_cond_imm(
     #[case] expected_pc: u16,
     #[case] expected_m: u8,
 ) {
-    let mut memory = memory_opc(opcode);
-    memory.write(1, imm1);
-    memory.write(2, imm2);
-
-    let reg = Registers::builder().f_zero(f_zero).f_carry(f_carry).build();
-    let mut cpu = Cpu::builder().registers(reg).memory(memory).build();
-    let m = cpu.step();
+    let mut mmu = MMU::builder()
+        .set(0, opcode)
+        .set(1, imm1)
+        .set(2, imm2)
+        .build();
+    let mut cpu = CPU::builder().f_zero(f_zero).f_carry(f_carry).build();
+    let m = cpu.step(&mut mmu);
 
     assert_eq!(cpu.get_pc(), expected_pc);
     assert_eq!(m, expected_m);
