@@ -185,6 +185,24 @@ fn test_add_a(
     assert_eq!(m, 2);
 }
 
+/// JUMP IMM (0xC3)
+#[rstest]
+#[case::basic_jump(0x11, 0x22, 0x2211)]
+#[case::jump_to_start(0, 0, 0)]
+#[case::jump_to_end(0xFF, 0xFF, 0xFFFF)]
+fn test_jump_imm(#[case] imm1: u8, #[case] imm2: u8, #[case] expected_pc: u16) {
+    let mut mmu = MMU::builder()
+        .set(0, 0xC3)
+        .set(1, imm1)
+        .set(2, imm2)
+        .build();
+    let mut cpu = CPU::default();
+
+    let m = cpu.step(&mut mmu);
+    assert_eq!(cpu.get_pc(), expected_pc);
+    assert_eq!(m, 4);
+}
+
 /// JUMP COND IMM
 #[rstest]
 #[case::nz_jump(0xC2, 0x34, 0x12, false, false, 0x1234, 4)]
@@ -214,4 +232,16 @@ fn test_jump_cond_imm(
 
     assert_eq!(cpu.get_pc(), expected_pc);
     assert_eq!(m, expected_m);
+}
+
+/// JUMP HL (0xE9)
+#[rstest]
+#[case::basic_jump(0x1337)]
+fn test_jump_hl(#[case] target_address: u16) {
+    let mut mmu = MMU::builder().set(0, 0xE9).build();
+    let mut cpu = CPU::builder().hl(target_address).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(cpu.get_pc(), target_address);
+    assert_eq!(m, 1);
 }

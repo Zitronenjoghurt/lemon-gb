@@ -26,6 +26,8 @@ impl CPU {
     pub fn execute(&mut self, instruction: Instruction, mut mmu: &MMU) -> (u16, u8) {
         match instruction {
             Instruction::Add(source_r8) => self.add(source_r8, &mmu),
+            Instruction::JpHL => self.jump_hl(),
+            Instruction::JpImm => self.jump_imm(&mmu),
             Instruction::JpCondImm(condition) => self.jump_condition_imm(condition, &mmu),
         }
     }
@@ -79,7 +81,7 @@ impl CPU {
     }
 }
 
-/// Arithmetic operations
+/// Direct instruction interfaces
 impl CPU {
     pub fn add(&mut self, source_r8: Register8, mmu: &MMU) -> (u16, u8) {
         let source_value = self.get_value_r8(source_r8, mmu);
@@ -98,14 +100,22 @@ impl CPU {
         self.instruction_result(1, m)
     }
 
+    pub fn jump_hl(&mut self) -> (u16, u8) {
+        (self.registers.get_hl(), 1)
+    }
+
+    pub fn jump_imm(&self, mmu: &MMU) -> (u16, u8) {
+        let least_significant_byte = mmu.read(self.get_pc() + 1);
+        let most_significant_byte = mmu.read(self.get_pc() + 2);
+        let new_pc = construct_u16(least_significant_byte, most_significant_byte);
+        (new_pc, 4)
+    }
+
     pub fn jump_condition_imm(&self, condition: JumpCondition, mmu: &MMU) -> (u16, u8) {
         let should_jump = self.check_jump_condition(condition);
 
         if should_jump {
-            let least_significant_byte = mmu.read(self.get_pc() + 1);
-            let most_significant_byte = mmu.read(self.get_pc() + 2);
-            let new_pc = construct_u16(least_significant_byte, most_significant_byte);
-            (new_pc, 4)
+            self.jump_imm(mmu)
         } else {
             self.instruction_result(3, 3)
         }
