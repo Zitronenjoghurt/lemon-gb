@@ -1,4 +1,4 @@
-use crate::enums::parameter_groups::{JumpCondition, R16, R8};
+use crate::enums::parameter_groups::{JumpCondition, R16Stack, R16, R8};
 use crate::game_boy::components::cpu::registers::builder::CPURegistersBuilder;
 use crate::game_boy::components::cpu::registers::flags_register::CPUFlagsRegister;
 use crate::game_boy::components::mmu::MMU;
@@ -6,6 +6,8 @@ use crate::helpers::bit_operations::{construct_u16, deconstruct_u16};
 
 pub mod builder;
 pub mod flags_register;
+
+const INITIAL_SP: u16 = 0xFFFE; // GB CPU Manual p. 64
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct CPURegisters {
@@ -26,6 +28,14 @@ pub struct CPURegisters {
 impl CPURegisters {
     pub fn builder() -> CPURegistersBuilder {
         CPURegistersBuilder::new()
+    }
+
+    pub fn initialize() -> Self {
+        Self {
+            sp: INITIAL_SP,
+            // Add more initial values as they become necessary
+            ..Default::default()
+        }
     }
 }
 
@@ -62,6 +72,24 @@ pub trait CpuRegistersAccessTrait {
             R16::DE => self.set_de(value),
             R16::HL => self.set_hl(value),
             R16::SP => self.set_sp(value),
+        }
+    }
+
+    fn get_r16_stack(&self, register: R16Stack) -> u16 {
+        match register {
+            R16Stack::BC => self.get_bc(),
+            R16Stack::DE => self.get_de(),
+            R16Stack::HL => self.get_hl(),
+            R16Stack::AF => self.get_af(),
+        }
+    }
+
+    fn set_r16_stack(&mut self, register: R16Stack, value: u16) {
+        match register {
+            R16Stack::BC => self.set_bc(value),
+            R16Stack::DE => self.set_de(value),
+            R16Stack::HL => self.set_hl(value),
+            R16Stack::AF => self.set_af(value),
         }
     }
 
@@ -134,6 +162,10 @@ pub trait CpuRegistersAccessTrait {
         self.get_registers().f.into()
     }
 
+    fn set_f(&mut self, value: u8) {
+        self.get_registers_mut().f = value.into()
+    }
+
     fn get_f_zero(&self) -> bool {
         self.get_registers().f.get_zero()
     }
@@ -180,6 +212,24 @@ pub trait CpuRegistersAccessTrait {
 
     fn set_sp(&mut self, value: u16) {
         self.get_registers_mut().sp = value;
+    }
+
+    fn increment_sp(&mut self) {
+        self.set_sp(self.get_sp().wrapping_add(1));
+    }
+
+    fn decrement_sp(&mut self) {
+        self.set_sp(self.get_sp().wrapping_sub(1));
+    }
+
+    fn get_af(&self) -> u16 {
+        construct_u16(self.get_f(), self.get_a())
+    }
+
+    fn set_af(&mut self, value: u16) {
+        let (f, a) = deconstruct_u16(value);
+        self.set_f(f);
+        self.set_a(a);
     }
 
     fn get_bc(&self) -> u16 {

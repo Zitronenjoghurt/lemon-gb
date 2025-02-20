@@ -7,7 +7,7 @@ pub mod components;
 pub struct GameBoy {
     /// Central Processing Unit
     cpu: CPU,
-    /// Memory Mapping Unit
+    /// Memory Management Unit
     /// Handles all memory storage and access
     mmu: MMU,
 }

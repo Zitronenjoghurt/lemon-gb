@@ -81,6 +81,11 @@ pub trait CPURegistersBuilderTrait: CpuRegistersAccessTrait + Sized {
         self
     }
 
+    fn af(mut self, value: u16) -> Self {
+        self.get_registers_mut().set_af(value);
+        self
+    }
+
     fn bc(mut self, value: u16) -> Self {
         self.get_registers_mut().set_bc(value);
         self

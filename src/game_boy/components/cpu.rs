@@ -1,8 +1,9 @@
-use crate::enums::parameter_groups::R8;
 use crate::enums::parameter_groups::{JumpCondition, R16};
+use crate::enums::parameter_groups::{R16Stack, R8};
 use crate::game_boy::components::cpu::builder::CpuBuilder;
 use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
 use crate::game_boy::components::mmu::MMU;
+use crate::helpers::bit_operations::{construct_u16, deconstruct_u16};
 use crate::instructions::Instruction;
 use registers::CPURegisters;
 
@@ -22,19 +23,27 @@ impl CPU {
         CpuBuilder::new()
     }
 
-    /// Returns (New PC, M Cycles taken)
-    pub fn execute(&mut self, instruction: Instruction, mut mmu: &MMU) -> (u16, u8) {
-        match instruction {
-            Instruction::Nop => (self.instruction_result(1, 1)),
-            Instruction::LoadR16Imm16(r16) => self.load_r16_imm(r16, &mmu),
-            Instruction::Add(r8) => self.add(r8, &mmu),
-            Instruction::JpHL => self.jump_hl(),
-            Instruction::JpImm => self.jump_imm(&mmu),
-            Instruction::JpCondImm16(condition) => self.jump_condition_imm(condition, &mmu),
+    pub fn initialize() -> Self {
+        Self {
+            registers: CPURegisters::initialize(),
         }
     }
 
-    pub fn step(&mut self, mut mmu: &MMU) -> u8 {
+    /// Returns (New PC, M Cycles taken)
+    pub fn execute(&mut self, instruction: Instruction, mmu: &mut MMU) -> (u16, u8) {
+        match instruction {
+            Instruction::Add(r8) => self.add(r8, mmu),
+            Instruction::JpHL => self.jump_hl(),
+            Instruction::JpImm => self.jump_imm(mmu),
+            Instruction::JpCondImm16(condition) => self.jump_condition_imm(condition, mmu),
+            Instruction::LoadR16Imm16(r16) => self.load_r16_imm(r16, mmu),
+            Instruction::Nop => self.instruction_result(1, 1),
+            Instruction::PopR16(r16_stack) => self.pop_r16(r16_stack, mmu),
+            Instruction::PushR16(r16_stack) => self.push_r16(r16_stack, mmu),
+        }
+    }
+
+    pub fn step(&mut self, mmu: &mut MMU) -> u8 {
         let mut instruction_byte = mmu.read(self.get_pc());
         let prefixed = instruction_byte == PREFIX_INSTRUCTION_BYTE;
         if prefixed {
@@ -42,7 +51,7 @@ impl CPU {
         }
 
         let instruction = Instruction::from_byte(instruction_byte, prefixed);
-        let (next_pc, m_cycles) = self.execute(instruction, &mut mmu);
+        let (next_pc, m_cycles) = self.execute(instruction, mmu);
         self.set_pc(next_pc);
 
         m_cycles
@@ -78,6 +87,22 @@ impl CPU {
         self.instruction_result(1, m)
     }
 
+    pub fn pop_r16(&mut self, r16_stack: R16Stack, mmu: &MMU) -> (u16, u8) {
+        let lsb = self.pop(mmu);
+        let msb = self.pop(mmu);
+        let value = construct_u16(lsb, msb);
+        self.set_r16_stack(r16_stack, value);
+        self.instruction_result(1, 3)
+    }
+
+    pub fn push_r16(&mut self, r16_stack: R16Stack, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r16_stack(r16_stack);
+        let (lsb, msb) = deconstruct_u16(value);
+        self.push(msb, mmu);
+        self.push(lsb, mmu);
+        self.instruction_result(1, 4)
+    }
+
     pub fn jump_hl(&mut self) -> (u16, u8) {
         let new_pc = self.get_hl();
         (new_pc, 1)
@@ -96,6 +121,20 @@ impl CPU {
         } else {
             self.instruction_result(3, 3)
         }
+    }
+}
+
+/// Basic operations
+impl CPU {
+    pub fn pop(&mut self, mmu: &MMU) -> u8 {
+        let value = mmu.read(self.get_sp());
+        self.increment_sp();
+        value
+    }
+
+    pub fn push(&mut self, value: u8, mmu: &mut MMU) {
+        self.decrement_sp();
+        mmu.write(self.get_sp(), value);
     }
 }
 

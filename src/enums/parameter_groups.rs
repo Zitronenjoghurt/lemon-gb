@@ -22,6 +22,14 @@ pub enum R16 {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+pub enum R16Stack {
+    BC = 0,
+    DE = 1,
+    HL = 2,
+    AF = 3,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum JumpCondition {
     NotZero = 0,
     Zero = 1,

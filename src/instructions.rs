@@ -1,18 +1,22 @@
-use crate::enums::parameter_groups::{JumpCondition, R16, R8};
+use crate::enums::parameter_groups::{JumpCondition, R16Stack, R16, R8};
 
 pub enum Instruction {
-    /// Does nothing, will stall a cycle
-    Nop,
-    /// Loads the following 2 bytes into the specified register
-    LoadR16Imm16(R16),
     /// Add the specified register to register A
     Add(R8),
+    /// Unconditional jump to the address specified in the HL register
+    JpHL,
     /// Unconditional jump to the address specified in the following 2 bytes
     JpImm,
     /// Conditional jump to the address specified in the following 2 bytes
     JpCondImm16(JumpCondition),
-    /// Unconditional jump to the address specified in the HL register
-    JpHL,
+    /// Loads the following 2 bytes into the specified register
+    LoadR16Imm16(R16),
+    /// Does nothing, will stall a cycle
+    Nop,
+    /// Pop 2 bytes from the stack to the specified register
+    PopR16(R16Stack),
+    /// Push 2 bytes from the specified register to the stack
+    PushR16(R16Stack),
 }
 
 impl Instruction {
@@ -39,12 +43,20 @@ impl Instruction {
             0b1000_0101 => Instruction::Add(R8::L),            // 0x85
             0b1000_0110 => Instruction::Add(R8::HL),           // 0x86
             0b1000_0111 => Instruction::Add(R8::A),            // 0x87
+            0b1100_0001 => Instruction::PopR16(R16Stack::BC),  // 0xC1
             0b1100_0010 => Instruction::JpCondImm16(JumpCondition::NotZero), // 0xC2
             0b1100_0011 => Instruction::JpImm,                 // 0xC3
+            0b1100_0101 => Instruction::PushR16(R16Stack::BC), // 0xC5
             0b1100_1010 => Instruction::JpCondImm16(JumpCondition::Zero), // 0xCA
+            0b1101_0001 => Instruction::PopR16(R16Stack::DE),  // 0xD1
             0b1101_0010 => Instruction::JpCondImm16(JumpCondition::NotCarry), // 0xD2
+            0b1101_0101 => Instruction::PushR16(R16Stack::DE), // 0xD5
             0b1101_1010 => Instruction::JpCondImm16(JumpCondition::Carry), // 0xDA
+            0b1110_0001 => Instruction::PopR16(R16Stack::HL),  // 0xE1
+            0b1110_0101 => Instruction::PushR16(R16Stack::HL), // 0xE5
             0b1110_1001 => Instruction::JpHL,                  // 0xE9
+            0b1111_0001 => Instruction::PopR16(R16Stack::AF),  // 0xF1
+            0b1111_0101 => Instruction::PushR16(R16Stack::AF), // 0xF5
             _ => panic!("Unknown unprefixed instruction byte: {:x}", byte),
         }
     }

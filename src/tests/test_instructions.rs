@@ -288,3 +288,67 @@ fn test_jump_hl(#[case] target_address: u16) {
     assert_eq!(cpu.get_pc(), target_address);
     assert_eq!(m, 1);
 }
+
+/// PUSH r16
+#[rstest]
+#[case::bc_push_basic(0xC5, 0xFFFE, 0x1337, 0x1337)]
+#[case::de_push_basic(0xD5, 0xFFFE, 0x1337, 0x1337)]
+#[case::hl_push_basic(0xE5, 0xFFFE, 0x1337, 0x1337)]
+// The lower 4 bits of the F register are hardwired to be read as zero, that's why this value deviates
+#[case::af_push_basic(0xF5, 0xFFFE, 0x1337, 0x1330)]
+fn test_push_r16(
+    #[case] opcode: u8,
+    #[case] sp: u16,
+    #[case] push_value: u16,
+    #[case] expected_value: u16,
+) {
+    let mut mmu = MMU::builder().set(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .sp(sp)
+        .bc(if opcode == 0xC5 { push_value } else { 0 })
+        .de(if opcode == 0xD5 { push_value } else { 0 })
+        .hl(if opcode == 0xE5 { push_value } else { 0 })
+        .af(if opcode == 0xF5 { push_value } else { 0 })
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(cpu.get_sp(), sp - 2);
+    assert_eq!(mmu.read_16(cpu.get_sp()), expected_value);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(m, 4);
+}
+
+/// POP r16
+#[rstest]
+#[case::bc_pop_basic(0xC1, 0xFFFC, 0x37, 0x13, 0x1337)]
+#[case::de_pop_basic(0xD1, 0xFFFC, 0x37, 0x13, 0x1337)]
+#[case::hl_pop_basic(0xE1, 0xFFFC, 0x37, 0x13, 0x1337)]
+// The lower 4 bits of the F register are hardwired to be read as zero, that's why this value deviates
+#[case::af_pop_basic(0xF1, 0xFFFC, 0x37, 0x13, 0x1330)]
+fn test_pop_r16(
+    #[case] opcode: u8,
+    #[case] sp: u16,
+    #[case] imm1: u8,
+    #[case] imm2: u8,
+    #[case] expected_value: u16,
+) {
+    let mut mmu = MMU::builder()
+        .set(0, opcode)
+        .set(sp, imm1)
+        .set(sp + 1, imm2)
+        .build();
+    let mut cpu = CPU::builder().sp(sp).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(cpu.get_sp(), sp + 2);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(m, 3);
+
+    match opcode {
+        0xC1 => assert_eq!(cpu.get_bc(), expected_value),
+        0xD1 => assert_eq!(cpu.get_de(), expected_value),
+        0xE1 => assert_eq!(cpu.get_hl(), expected_value),
+        0xF1 => assert_eq!(cpu.get_af(), expected_value),
+        _ => panic!("Unexpected opcode"),
+    }
+}

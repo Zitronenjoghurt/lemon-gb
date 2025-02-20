@@ -17,3 +17,5 @@ The sources I have used to create this emulator.
     - Really nice technical documentation
 - https://gekkio.fi/files/gb-docs/gbctr.pdf
     - Great for going in-depth into more specific things
+- http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
+    - Detailed CPU explanations
