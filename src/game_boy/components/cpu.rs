@@ -16,6 +16,9 @@ const PREFIX_INSTRUCTION_BYTE: u8 = 0xCB;
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct CPU {
     registers: CPURegisters,
+    /// Interrupt Master Enable Flag
+    /// When this flag is enabled, interrupts will be acknowledged, else they will be ignored
+    ime: bool,
 }
 
 impl CPU {
@@ -26,6 +29,7 @@ impl CPU {
     pub fn initialize() -> Self {
         Self {
             registers: CPURegisters::initialize(),
+            ..Default::default()
         }
     }
 
