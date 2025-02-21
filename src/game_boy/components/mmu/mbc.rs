@@ -1,7 +1,7 @@
 use crate::game_boy::components::cartridge::types::MbcType;
 use crate::game_boy::components::mmu::mbc::mbc1::Mbc1;
 
-mod mbc1;
+pub mod mbc1;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Mbc {

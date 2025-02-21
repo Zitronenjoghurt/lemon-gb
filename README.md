@@ -19,3 +19,5 @@ The sources I have used to create this emulator.
     - Great for going in-depth into more specific things
 - http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
     - Detailed CPU explanations
+- https://hacktix.github.io/GBEDG/
+    - Even more detailed information especially for the PPU and timer

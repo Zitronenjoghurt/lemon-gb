@@ -5,7 +5,7 @@ use crate::game_boy::components::mmu::mbc::Mbc;
 use crate::helpers::bit_operations::construct_u16;
 
 mod builder;
-mod mbc;
+pub mod mbc;
 
 pub const ROM_BANK_SIZE: usize = 0x4000; // 16KB
 const RAM_BANK_SIZE: usize = 0x2000; // 8KB
