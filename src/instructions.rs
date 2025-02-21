@@ -1,17 +1,22 @@
 use crate::enums::parameter_groups::{JumpCondition, R16Stack, R16, R8};
+use crate::game_boy::components::cpu::PREFIX_INSTRUCTION_BYTE;
+use std::error::Error;
+use std::fmt::Display;
 
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum Instruction {
     /// Add the specified register to register A
     Add(R8),
     /// Unconditional jump to the address specified in the HL register
     JpHL,
     /// Unconditional jump to the address specified in the following 2 bytes
-    JpImm,
+    JpImm16,
     /// Conditional jump to the address specified in the following 2 bytes
     JpCondImm16(JumpCondition),
     /// Loads the following 2 bytes into the specified register
     LoadR16Imm16(R16),
     /// Does nothing, will stall a cycle
+    #[default]
     Nop,
     /// Pop 2 bytes from the stack to the specified register
     PopR16(R16Stack),
@@ -20,50 +25,130 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    pub fn from_byte(byte: u8, prefixed: bool) -> Self {
+    pub fn from_byte(byte: u8, prefixed: bool) -> Result<Self, Box<dyn Error>> {
         if prefixed {
-            Instruction::from_byte_prefixed(byte)
+            Self::from_byte_prefixed(byte)
         } else {
-            Instruction::from_byte_unprefixed(byte)
+            Self::from_byte_unprefixed(byte)
         }
     }
 
-    pub fn from_byte_unprefixed(byte: u8) -> Self {
+    pub fn from_byte_unprefixed(byte: u8) -> Result<Self, Box<dyn Error>> {
         match byte {
-            0b0000_0000 => Instruction::Nop,                   // 0x00
-            0b0000_0001 => Instruction::LoadR16Imm16(R16::BC), // 0x01
-            0b0001_0001 => Instruction::LoadR16Imm16(R16::DE), // 0x11
-            0b0010_0001 => Instruction::LoadR16Imm16(R16::HL), // 0x21
-            0b0011_0001 => Instruction::LoadR16Imm16(R16::SP), // 0x31
-            0b1000_0000 => Instruction::Add(R8::B),            // 0x80
-            0b1000_0001 => Instruction::Add(R8::C),            // 0x81
-            0b1000_0010 => Instruction::Add(R8::D),            // 0x82
-            0b1000_0011 => Instruction::Add(R8::E),            // 0x83
-            0b1000_0100 => Instruction::Add(R8::H),            // 0x84
-            0b1000_0101 => Instruction::Add(R8::L),            // 0x85
-            0b1000_0110 => Instruction::Add(R8::HL),           // 0x86
-            0b1000_0111 => Instruction::Add(R8::A),            // 0x87
-            0b1100_0001 => Instruction::PopR16(R16Stack::BC),  // 0xC1
-            0b1100_0010 => Instruction::JpCondImm16(JumpCondition::NotZero), // 0xC2
-            0b1100_0011 => Instruction::JpImm,                 // 0xC3
-            0b1100_0101 => Instruction::PushR16(R16Stack::BC), // 0xC5
-            0b1100_1010 => Instruction::JpCondImm16(JumpCondition::Zero), // 0xCA
-            0b1101_0001 => Instruction::PopR16(R16Stack::DE),  // 0xD1
-            0b1101_0010 => Instruction::JpCondImm16(JumpCondition::NotCarry), // 0xD2
-            0b1101_0101 => Instruction::PushR16(R16Stack::DE), // 0xD5
-            0b1101_1010 => Instruction::JpCondImm16(JumpCondition::Carry), // 0xDA
-            0b1110_0001 => Instruction::PopR16(R16Stack::HL),  // 0xE1
-            0b1110_0101 => Instruction::PushR16(R16Stack::HL), // 0xE5
-            0b1110_1001 => Instruction::JpHL,                  // 0xE9
-            0b1111_0001 => Instruction::PopR16(R16Stack::AF),  // 0xF1
-            0b1111_0101 => Instruction::PushR16(R16Stack::AF), // 0xF5
-            _ => panic!("Unknown unprefixed instruction byte: {:x}", byte),
+            0b0000_0000 => Ok(Instruction::Nop),                   // 0x00
+            0b0000_0001 => Ok(Instruction::LoadR16Imm16(R16::BC)), // 0x01
+            0b0001_0001 => Ok(Instruction::LoadR16Imm16(R16::DE)), // 0x11
+            0b0010_0001 => Ok(Instruction::LoadR16Imm16(R16::HL)), // 0x21
+            0b0011_0001 => Ok(Instruction::LoadR16Imm16(R16::SP)), // 0x31
+            0b1000_0000 => Ok(Instruction::Add(R8::B)),            // 0x80
+            0b1000_0001 => Ok(Instruction::Add(R8::C)),            // 0x81
+            0b1000_0010 => Ok(Instruction::Add(R8::D)),            // 0x82
+            0b1000_0011 => Ok(Instruction::Add(R8::E)),            // 0x83
+            0b1000_0100 => Ok(Instruction::Add(R8::H)),            // 0x84
+            0b1000_0101 => Ok(Instruction::Add(R8::L)),            // 0x85
+            0b1000_0110 => Ok(Instruction::Add(R8::HL)),           // 0x86
+            0b1000_0111 => Ok(Instruction::Add(R8::A)),            // 0x87
+            0b1100_0001 => Ok(Instruction::PopR16(R16Stack::BC)),  // 0xC1
+            0b1100_0010 => Ok(Instruction::JpCondImm16(JumpCondition::NotZero)), // 0xC2
+            0b1100_0011 => Ok(Instruction::JpImm16),               // 0xC3
+            0b1100_0101 => Ok(Instruction::PushR16(R16Stack::BC)), // 0xC5
+            0b1100_1010 => Ok(Instruction::JpCondImm16(JumpCondition::Zero)), // 0xCA
+            0b1101_0001 => Ok(Instruction::PopR16(R16Stack::DE)),  // 0xD1
+            0b1101_0010 => Ok(Instruction::JpCondImm16(JumpCondition::NotCarry)), // 0xD2
+            0b1101_0101 => Ok(Instruction::PushR16(R16Stack::DE)), // 0xD5
+            0b1101_1010 => Ok(Instruction::JpCondImm16(JumpCondition::Carry)), // 0xDA
+            0b1110_0001 => Ok(Instruction::PopR16(R16Stack::HL)),  // 0xE1
+            0b1110_0101 => Ok(Instruction::PushR16(R16Stack::HL)), // 0xE5
+            0b1110_1001 => Ok(Instruction::JpHL),                  // 0xE9
+            0b1111_0001 => Ok(Instruction::PopR16(R16Stack::AF)),  // 0xF1
+            0b1111_0101 => Ok(Instruction::PushR16(R16Stack::AF)), // 0xF5
+            _ => Err(format!("Unknown unprefixed instruction byte: {:02X}", byte).into()),
         }
     }
 
-    pub fn from_byte_prefixed(byte: u8) -> Self {
+    pub fn from_byte_prefixed(byte: u8) -> Result<Self, Box<dyn Error>> {
         match byte {
-            _ => panic!("Unknown prefixed instruction byte: {:x}", byte),
+            _ => Err(format!("Unknown prefixed instruction byte: {:02X}", byte).into()),
+        }
+    }
+
+    pub fn get_length(&self) -> usize {
+        match self {
+            Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) => 3,
+            Self::Nop | Self::Add(_) | Self::JpHL | Self::PopR16(_) | Self::PushR16(_) => 1,
+        }
+    }
+
+    pub fn parse_clear_text_instructions_from_data(
+        data: &[u8],
+        detailed: bool,
+    ) -> Result<Vec<String>, Box<dyn Error>> {
+        let mut instructions = Vec::new();
+        let mut i = 0;
+
+        while i < data.len() {
+            let prefixed = if data[i] == PREFIX_INSTRUCTION_BYTE {
+                i += 1;
+                if i == data.len() {
+                    break;
+                }
+                true
+            } else {
+                false
+            };
+
+            let current_byte = data[i];
+            let instruction = Instruction::from_byte(current_byte, prefixed)?;
+            let lsb = data.get(i + 1).copied().unwrap_or(0);
+            let msb = data.get(i + 2).copied().unwrap_or(0);
+
+            let text = if !detailed {
+                instruction.parse_clear_text(lsb, msb)
+            } else {
+                instruction.parse_description(lsb, msb)
+            };
+
+            instructions.push(format!("[0x{:02X}] {text}", current_byte));
+            i += instruction.get_length();
+        }
+
+        Ok(instructions)
+    }
+
+    /// Takes in the 2 following bytes after the instruction
+    pub fn parse_clear_text(&self, lsb: u8, msb: u8) -> String {
+        match self {
+            Self::Nop => "NOP".into(),
+            Self::Add(r8) => format!("ADD A, {r8}"),
+            Self::JpHL => "JP HL".into(),
+            Self::JpImm16 => format!("JP 0x{:02X}{:02X}", msb, lsb),
+            Self::JpCondImm16(cond) => format!("JP {cond}, 0x{:02X}{:02X}", msb, lsb),
+            Self::LoadR16Imm16(r16) => format!("LD {r16}, 0x{:02X}{:02X}", msb, lsb),
+            Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
+            Self::PushR16(r16_stack) => format!("PUSH {r16_stack}"),
+        }
+    }
+
+    /// Takes in the 2 following bytes after the instruction
+    pub fn parse_description(&self, lsb: u8, msb: u8) -> String {
+        match self {
+            Self::Nop => "No Operation".into(),
+            Self::Add(r8) => format!("Add value from register {r8} to register A"),
+            Self::JpHL => "Jump to the address specified in register HL".into(),
+            Self::JpImm16 => format!("Jump to address 0x{:02X}{:02X}", msb, lsb),
+            Self::JpCondImm16(cond) => {
+                format!(
+                    "If {}, jump to address 0x{:02X}{:02X}",
+                    cond.description(),
+                    msb,
+                    lsb
+                )
+            }
+            Self::LoadR16Imm16(r16) => {
+                format!("Load 0x{:02X}{:02X} into register {r16}", msb, lsb)
+            }
+            Self::PopR16(r16_stack) => format!("Pop value from stack into register {r16_stack}"),
+            Self::PushR16(r16_stack) => format!("Push value in {r16_stack} onto the stack"),
         }
     }
 }

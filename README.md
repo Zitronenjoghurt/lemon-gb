@@ -13,7 +13,7 @@ The sources I have used to create this emulator.
 
 - https://rylev.github.io/DMG-01/public/book/introduction.html
     - Great entrypoint for building the foundation of the emulator
-- https://gbdev.io/pandocs/CPU_Instruction_Set.html
+- https://gbdev.io/pandocs/
     - Really nice technical documentation
 - https://gekkio.fi/files/gb-docs/gbctr.pdf
     - Great for going in-depth into more specific things

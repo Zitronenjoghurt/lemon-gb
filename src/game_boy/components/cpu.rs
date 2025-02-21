@@ -11,7 +11,7 @@ mod builder;
 pub mod registers;
 
 /// This tells the CPU that the next instruction to be executed is a prefixed instruction
-const PREFIX_INSTRUCTION_BYTE: u8 = 0xCB;
+pub const PREFIX_INSTRUCTION_BYTE: u8 = 0xCB;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct CPU {
@@ -38,7 +38,7 @@ impl CPU {
         match instruction {
             Instruction::Add(r8) => self.add(r8, mmu),
             Instruction::JpHL => self.jump_hl(),
-            Instruction::JpImm => self.jump_imm(mmu),
+            Instruction::JpImm16 => self.jump_imm(mmu),
             Instruction::JpCondImm16(condition) => self.jump_condition_imm(condition, mmu),
             Instruction::LoadR16Imm16(r16) => self.load_r16_imm(r16, mmu),
             Instruction::Nop => self.instruction_result(1, 1),
@@ -54,7 +54,7 @@ impl CPU {
             instruction_byte = mmu.read(self.get_pc().wrapping_add(1));
         }
 
-        let instruction = Instruction::from_byte(instruction_byte, prefixed);
+        let instruction = Instruction::from_byte(instruction_byte, prefixed).unwrap();
         let (next_pc, m_cycles) = self.execute(instruction, mmu);
         self.set_pc(next_pc);
 

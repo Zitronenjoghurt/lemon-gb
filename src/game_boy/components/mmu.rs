@@ -4,7 +4,7 @@ use crate::helpers::bit_operations::construct_u16;
 
 mod builder;
 
-const ROM_BANK_SIZE: usize = 0x4000; // 16KB
+pub const ROM_BANK_SIZE: usize = 0x4000; // 16KB
 const RAM_BANK_SIZE: usize = 0x2000; // 8KB
 const VRAM_SIZE: usize = 0x2000; // 8KB
 const WRAM_SIZE: usize = 0x2000; // 8KB
@@ -187,7 +187,7 @@ impl Default for MMU {
         Self {
             rom_banks: vec![[0; ROM_BANK_SIZE]; 2],
             current_rom_bank: 1,
-            ram_banks: vec![[0; RAM_BANK_SIZE]; 2],
+            ram_banks: vec![[0; RAM_BANK_SIZE]; 1],
             current_ram_bank: 0,
             ram_enabled: false,
             vram: [0; VRAM_SIZE],

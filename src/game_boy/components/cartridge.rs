@@ -1,29 +1,35 @@
+use crate::game_boy::components::cartridge::header::CartridgeHeader;
+use crate::game_boy::components::mmu::ROM_BANK_SIZE;
+use std::error::Error;
+use std::path::PathBuf;
+
+mod header;
 pub mod types;
 
-/// Returns the amount of rom banks the cartridge uses (if valid)
-pub fn parse_rom_size(byte: u8) -> Option<usize> {
-    match byte {
-        0x00 => Some(2),
-        0x01 => Some(4),
-        0x02 => Some(8),
-        0x03 => Some(16),
-        0x04 => Some(32),
-        0x05 => Some(64),
-        0x06 => Some(128),
-        0x07 => Some(256),
-        0x08 => Some(512),
-        _ => None,
-    }
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Cartridge {
+    pub rom_banks: Vec<[u8; ROM_BANK_SIZE]>,
+    pub header: CartridgeHeader,
 }
 
-/// Returns the amount of ram banks the cartridge uses (if valid)
-pub fn parse_ram_size(byte: u8) -> Option<usize> {
-    match byte {
-        0x00 => Some(0),
-        0x02 => Some(1),
-        0x03 => Some(4),
-        0x04 => Some(16),
-        0x05 => Some(8),
-        _ => None,
+impl Cartridge {
+    pub fn load(path: PathBuf) -> Result<Cartridge, Box<dyn Error>> {
+        let data = std::fs::read(path)?;
+        let header = CartridgeHeader::parse(&data)?;
+
+        let mut rom_banks = Vec::with_capacity(header.rom_size);
+        for bank_index in 0..header.rom_size {
+            let mut bank = [0u8; ROM_BANK_SIZE];
+            let start = bank_index * ROM_BANK_SIZE;
+
+            if start < data.len() {
+                let end = (start + ROM_BANK_SIZE).min(data.len());
+                bank[..(end - start)].copy_from_slice(&data[start..end]);
+            }
+
+            rom_banks.push(bank);
+        }
+
+        Ok(Cartridge { rom_banks, header })
     }
 }
