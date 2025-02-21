@@ -3,6 +3,13 @@ const SUBTRACT_FLAG: u8 = 0b0100_0000;
 const HALF_CARRY_FLAG: u8 = 0b0010_0000;
 const CARRY_FLAG: u8 = 0b0001_0000;
 
+// Initial Flags register values according to: https://gbdev.io/pandocs/Power_Up_Sequence.html?highlight=state#console-state-after-boot-rom-hand-off
+// Model: DMG0
+const INITIAL_Z: bool = false;
+const INITIAL_N: bool = false;
+const INITIAL_H: bool = false;
+const INITIAL_C: bool = false;
+
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub struct CPUFlagsRegister {
     /// Set to true if the result of the operation is equal to 0
@@ -16,6 +23,15 @@ pub struct CPUFlagsRegister {
 }
 
 impl CPUFlagsRegister {
+    pub fn initialize() -> Self {
+        Self {
+            zero: INITIAL_Z,
+            subtract: INITIAL_N,
+            half_carry: INITIAL_H,
+            carry: INITIAL_C,
+        }
+    }
+
     pub fn get_zero(&self) -> bool {
         self.zero
     }

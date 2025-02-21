@@ -79,15 +79,15 @@ impl CartridgeHeader {
 
     fn parse_rom_size(data: u8) -> Result<usize, Box<dyn Error>> {
         match data {
-            0x00 => Ok(2),
-            0x01 => Ok(4),
-            0x02 => Ok(8),
-            0x03 => Ok(16),
-            0x04 => Ok(32),
-            0x05 => Ok(64),
-            0x06 => Ok(128),
-            0x07 => Ok(256),
-            0x08 => Ok(512),
+            0x00 => Ok(2),   // 32KB
+            0x01 => Ok(4),   // 64KB
+            0x02 => Ok(8),   // 128KB
+            0x03 => Ok(16),  // 256KB
+            0x04 => Ok(32),  // 512KB
+            0x05 => Ok(64),  // 1024KB
+            0x06 => Ok(128), // 2048KB
+            0x07 => Ok(256), // 4096KB
+            0x08 => Ok(512), // 8192KB
             _ => Err(format!("Invalid ROM size: 0x{:02X}", data).into()),
         }
     }

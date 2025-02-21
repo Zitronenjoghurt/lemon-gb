@@ -3,7 +3,7 @@ use crate::game_boy::components::mmu::ROM_BANK_SIZE;
 use std::error::Error;
 use std::path::PathBuf;
 
-mod header;
+pub mod header;
 pub mod types;
 
 #[derive(Debug, Default, Clone, PartialEq)]

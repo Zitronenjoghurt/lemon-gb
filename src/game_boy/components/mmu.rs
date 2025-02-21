@@ -1,8 +1,11 @@
-use crate::game_boy::components::cartridge::types::MbcType;
+use crate::game_boy::components::cartridge::header::CartridgeHeader;
+use crate::game_boy::components::cartridge::Cartridge;
 use crate::game_boy::components::mmu::builder::MMUBuilder;
+use crate::game_boy::components::mmu::mbc::Mbc;
 use crate::helpers::bit_operations::construct_u16;
 
 mod builder;
+mod mbc;
 
 pub const ROM_BANK_SIZE: usize = 0x4000; // 16KB
 const RAM_BANK_SIZE: usize = 0x2000; // 8KB
@@ -12,14 +15,56 @@ const OAM_SIZE: usize = 160; // Bytes
 const HRAM_SIZE: usize = 127; // Bytes
 const IO_REGISTERS_SIZE: usize = 160; // Bytes
 
+// Initial hardware registers using the DMG0 Model
+// https://gbdev.io/pandocs/Power_Up_Sequence.html?highlight=state#console-state-after-boot-rom-hand-off
+const INITIAL_P1: u8 = 0xCF;
+const INITIAL_SB: u8 = 0x00;
+const INITIAL_SC: u8 = 0x7E;
+const INITIAL_DIV: u8 = 0x18;
+const INITIAL_TIMA: u8 = 0x00;
+const INITIAL_TMA: u8 = 0x00;
+const INITIAL_TAC: u8 = 0xF8;
+const INITIAL_IF: u8 = 0xE1;
+const INITIAL_NR10: u8 = 0x80;
+const INITIAL_NR11: u8 = 0xBF;
+const INITIAL_NR12: u8 = 0xF3;
+const INITIAL_NR13: u8 = 0xFF;
+const INITIAL_NR14: u8 = 0xBF;
+const INITIAL_NR21: u8 = 0x3F;
+const INITIAL_NR22: u8 = 0x00;
+const INITIAL_NR23: u8 = 0xFF;
+const INITIAL_NR24: u8 = 0xBF;
+const INITIAL_NR30: u8 = 0x7F;
+const INITIAL_NR31: u8 = 0xFF;
+const INITIAL_NR32: u8 = 0x9F;
+const INITIAL_NR33: u8 = 0xFF;
+const INITIAL_NR34: u8 = 0xBF;
+const INITIAL_NR41: u8 = 0xFF;
+const INITIAL_NR42: u8 = 0x00;
+const INITIAL_NR43: u8 = 0x00;
+const INITIAL_NR44: u8 = 0xBF;
+const INITIAL_NR50: u8 = 0x77;
+const INITIAL_NR51: u8 = 0xF3;
+const INITIAL_NR52: u8 = 0xF1;
+const INITIAL_LCDC: u8 = 0x91;
+const INITIAL_STAT: u8 = 0x81;
+const INITIAL_SCY: u8 = 0x00;
+const INITIAL_SCX: u8 = 0x00;
+const INITIAL_LY: u8 = 0x91;
+const INITIAL_LYC: u8 = 0x00;
+const INITIAL_DMA: u8 = 0xFF;
+const INITIAL_BGP: u8 = 0xFC;
+const INITIAL_WY: u8 = 0x00;
+const INITIAL_WX: u8 = 0x00;
+const INITIAL_IE: u8 = 0x00;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MMU {
-    rom_banks: Vec<[u8; ROM_BANK_SIZE]>,
-    current_rom_bank: usize,
+    cartridge_header: CartridgeHeader,
 
+    mbc: Mbc,
+    rom_banks: Vec<[u8; ROM_BANK_SIZE]>,
     ram_banks: Vec<[u8; RAM_BANK_SIZE]>,
-    current_ram_bank: usize,
-    ram_enabled: bool,
 
     vram: [u8; VRAM_SIZE],
     wram: [u8; WRAM_SIZE],
@@ -28,9 +73,6 @@ pub struct MMU {
     io_registers: [u8; IO_REGISTERS_SIZE],
     hram: [u8; HRAM_SIZE],
     ie_register: u8,
-
-    mbc_type: MbcType,
-    banking_mode: u8,
 }
 
 impl MMU {
@@ -38,29 +80,72 @@ impl MMU {
         MMUBuilder::new()
     }
 
-    pub fn initialize(rom_banks: usize, ram_banks: usize, mbc_type: MbcType) -> Self {
+    pub fn initialize(cartridge: &Cartridge) -> Self {
         Self {
-            rom_banks: vec![[0; ROM_BANK_SIZE]; rom_banks],
-            current_rom_bank: 1,
-            ram_banks: vec![[0; RAM_BANK_SIZE]; ram_banks],
-            current_ram_bank: 0,
-            ram_enabled: false,
+            cartridge_header: cartridge.header.clone(),
+            mbc: Mbc::initialize(cartridge.header.cartridge_type.into()),
+            rom_banks: cartridge.rom_banks.clone(),
+            ram_banks: vec![[0; RAM_BANK_SIZE]; cartridge.header.ram_size],
             vram: [0; VRAM_SIZE],
             wram: [0; WRAM_SIZE],
             oam: [0; OAM_SIZE],
-            io_registers: [0; IO_REGISTERS_SIZE],
+            io_registers: Self::initialize_io_registers(),
             hram: [0; HRAM_SIZE],
-            ie_register: 0,
-            mbc_type,
-            banking_mode: 0,
+            ie_register: INITIAL_IE,
         }
+    }
+
+    // Using the DMG0 model
+    pub fn initialize_io_registers() -> [u8; IO_REGISTERS_SIZE] {
+        let absolute_address: usize = 0xFF00;
+        let mut io_registers = [0u8; IO_REGISTERS_SIZE];
+        io_registers[0xFF00 - absolute_address] = INITIAL_P1;
+        io_registers[0xFF01 - absolute_address] = INITIAL_SB;
+        io_registers[0xFF02 - absolute_address] = INITIAL_SC;
+        io_registers[0xFF04 - absolute_address] = INITIAL_DIV;
+        io_registers[0xFF05 - absolute_address] = INITIAL_TIMA;
+        io_registers[0xFF06 - absolute_address] = INITIAL_TMA;
+        io_registers[0xFF07 - absolute_address] = INITIAL_TAC;
+        io_registers[0xFF0F - absolute_address] = INITIAL_IF;
+        io_registers[0xFF10 - absolute_address] = INITIAL_NR10;
+        io_registers[0xFF11 - absolute_address] = INITIAL_NR11;
+        io_registers[0xFF12 - absolute_address] = INITIAL_NR12;
+        io_registers[0xFF13 - absolute_address] = INITIAL_NR13;
+        io_registers[0xFF14 - absolute_address] = INITIAL_NR14;
+        io_registers[0xFF16 - absolute_address] = INITIAL_NR21;
+        io_registers[0xFF17 - absolute_address] = INITIAL_NR22;
+        io_registers[0xFF18 - absolute_address] = INITIAL_NR23;
+        io_registers[0xFF19 - absolute_address] = INITIAL_NR24;
+        io_registers[0xFF1A - absolute_address] = INITIAL_NR30;
+        io_registers[0xFF1B - absolute_address] = INITIAL_NR31;
+        io_registers[0xFF1C - absolute_address] = INITIAL_NR32;
+        io_registers[0xFF1D - absolute_address] = INITIAL_NR33;
+        io_registers[0xFF1E - absolute_address] = INITIAL_NR34;
+        io_registers[0xFF20 - absolute_address] = INITIAL_NR41;
+        io_registers[0xFF21 - absolute_address] = INITIAL_NR42;
+        io_registers[0xFF22 - absolute_address] = INITIAL_NR43;
+        io_registers[0xFF23 - absolute_address] = INITIAL_NR44;
+        io_registers[0xFF24 - absolute_address] = INITIAL_NR50;
+        io_registers[0xFF25 - absolute_address] = INITIAL_NR51;
+        io_registers[0xFF26 - absolute_address] = INITIAL_NR52;
+        io_registers[0xFF40 - absolute_address] = INITIAL_LCDC;
+        io_registers[0xFF41 - absolute_address] = INITIAL_STAT;
+        io_registers[0xFF42 - absolute_address] = INITIAL_SCY;
+        io_registers[0xFF43 - absolute_address] = INITIAL_SCX;
+        io_registers[0xFF44 - absolute_address] = INITIAL_LY;
+        io_registers[0xFF45 - absolute_address] = INITIAL_LYC;
+        io_registers[0xFF46 - absolute_address] = INITIAL_DMA;
+        io_registers[0xFF47 - absolute_address] = INITIAL_BGP;
+        io_registers[0xFF4A - absolute_address] = INITIAL_WY;
+        io_registers[0xFF4B - absolute_address] = INITIAL_WX;
+        io_registers
     }
 
     #[allow(unreachable_patterns)]
     pub fn read(&self, address: u16) -> u8 {
         match address {
-            0x0000..=0x3FFF => self.get_rom(0, address),
-            0x4000..=0x7FFF => self.get_rom(self.current_rom_bank, address - 0x4000),
+            0x0000..=0x3FFF => self.get_rom(self.mbc.get_lower_rom_index(), address),
+            0x4000..=0x7FFF => self.get_rom(self.mbc.get_upper_rom_index(), address - 0x4000),
             0x8000..=0x9FFF => self.get_vram(address - 0x8000),
             0xA000..=0xBFFF => self.get_ram(address - 0xA000),
             0xC000..=0xDFFF => self.get_wram(address - 0xC000),
@@ -77,8 +162,10 @@ impl MMU {
     #[allow(unreachable_patterns)]
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
-            0x0000..=0x3FFF => self.set_rom(0, address, value),
-            0x4000..=0x7FFF => self.set_rom(self.current_rom_bank, address - 0x4000, value),
+            0x0000..=0x3FFF => self.set_rom(self.mbc.get_lower_rom_index(), address, value),
+            0x4000..=0x7FFF => {
+                self.set_rom(self.mbc.get_upper_rom_index(), address - 0x4000, value)
+            }
             0x8000..=0x9FFF => self.set_vram(address - 0x8000, value),
             0xA000..=0xBFFF => self.set_ram(address - 0xA000, value),
             0xC000..=0xDFFF => self.set_wram(address - 0xC000, value),
@@ -107,6 +194,7 @@ impl MMU {
     }
 
     fn set_rom(&mut self, bank: usize, index: u16, value: u8) {
+        self.mbc.handle_write(index, value);
         self.rom_banks[bank][index as usize] = value;
     }
 
@@ -119,16 +207,17 @@ impl MMU {
     }
 
     fn get_ram(&self, index: u16) -> u8 {
-        if !self.ram_banks.is_empty() && self.ram_enabled {
-            self.ram_banks[self.current_ram_bank][index as usize]
+        if !self.ram_banks.is_empty() && self.mbc.ram_enabled() {
+            self.ram_banks[self.mbc.get_ram_index()][index as usize]
         } else {
+            // Pan Docs say this is not guaranteed, but often the case
             0xFF
         }
     }
 
     fn set_ram(&mut self, index: u16, value: u8) {
-        if !self.ram_banks.is_empty() && self.ram_enabled {
-            self.ram_banks[self.current_ram_bank][index as usize] = value;
+        if !self.ram_banks.is_empty() && self.mbc.ram_enabled() {
+            self.ram_banks[self.mbc.get_ram_index()][index as usize] = value;
         }
     }
 
@@ -185,19 +274,16 @@ impl MMU {
 impl Default for MMU {
     fn default() -> Self {
         Self {
+            cartridge_header: CartridgeHeader::default(),
+            mbc: Mbc::None,
             rom_banks: vec![[0; ROM_BANK_SIZE]; 2],
-            current_rom_bank: 1,
             ram_banks: vec![[0; RAM_BANK_SIZE]; 1],
-            current_ram_bank: 0,
-            ram_enabled: false,
             vram: [0; VRAM_SIZE],
             wram: [0; WRAM_SIZE],
             oam: [0; OAM_SIZE],
             io_registers: [0; IO_REGISTERS_SIZE],
             hram: [0; HRAM_SIZE],
             ie_register: 0,
-            mbc_type: MbcType::None,
-            banking_mode: 0,
         }
     }
 }

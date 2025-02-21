@@ -7,7 +7,17 @@ use crate::helpers::bit_operations::{construct_u16, deconstruct_u16};
 pub mod builder;
 pub mod flags_register;
 
-const INITIAL_SP: u16 = 0xFFFE; // GB CPU Manual p. 64
+// Initial CPU register values according to: https://gbdev.io/pandocs/Power_Up_Sequence.html?highlight=state#console-state-after-boot-rom-hand-off
+// Model: DMG0
+const INITIAL_A: u8 = 0x01;
+const INITIAL_B: u8 = 0xFF;
+const INITIAL_C: u8 = 0x13;
+const INITIAL_D: u8 = 0x00;
+const INITIAL_E: u8 = 0xC1;
+const INITIAL_H: u8 = 0x84;
+const INITIAL_L: u8 = 0x03;
+const INITIAL_PC: u16 = 0x0100;
+const INITIAL_SP: u16 = 0xFFFE;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct CPURegisters {
@@ -32,9 +42,16 @@ impl CPURegisters {
 
     pub fn initialize() -> Self {
         Self {
+            a: INITIAL_A,
+            b: INITIAL_B,
+            c: INITIAL_C,
+            d: INITIAL_D,
+            e: INITIAL_E,
+            f: CPUFlagsRegister::initialize(),
+            h: INITIAL_H,
+            l: INITIAL_L,
+            pc: INITIAL_PC,
             sp: INITIAL_SP,
-            // Add more initial values as they become necessary
-            ..Default::default()
         }
     }
 }

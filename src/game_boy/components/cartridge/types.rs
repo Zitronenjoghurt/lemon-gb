@@ -3,12 +3,44 @@ use std::error::Error;
 /// This will tell the MMU how to behave during memory access
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum MbcType {
+    Unsupported(CartridgeType),
     // 32 KiB ROM, optionally 8 KiB of RAM
     None,
     MBC1,
     MBC2,
     MBC3,
     MBC5,
+    MBC6,
+    MBC7,
+}
+
+impl From<CartridgeType> for MbcType {
+    fn from(value: CartridgeType) -> Self {
+        match value {
+            CartridgeType::RomOnly => MbcType::None,
+            CartridgeType::MBC1
+            | CartridgeType::MBC1Ram
+            | CartridgeType::MBC1RamBattery
+            | CartridgeType::MMM01
+            | CartridgeType::MMM01Ram
+            | CartridgeType::MMM01RamBattery => MbcType::MBC1,
+            CartridgeType::MBC2 | CartridgeType::MBC2Battery => MbcType::MBC2,
+            CartridgeType::MBC3
+            | CartridgeType::MBC3Ram
+            | CartridgeType::MBC3RamBattery
+            | CartridgeType::MBC3TimerBattery
+            | CartridgeType::MBC3TimerRamBattery => MbcType::MBC3,
+            CartridgeType::MBC5
+            | CartridgeType::MBC5Ram
+            | CartridgeType::MBC5RamBattery
+            | CartridgeType::MBC5Rumble
+            | CartridgeType::MBC5RumbleRam
+            | CartridgeType::MBC5RumbleRamBattery => MbcType::MBC5,
+            CartridgeType::MBC6 => MbcType::MBC6,
+            CartridgeType::MBC7SensorRumbleRamBattery => MbcType::MBC7,
+            _ => MbcType::Unsupported(value),
+        }
+    }
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
