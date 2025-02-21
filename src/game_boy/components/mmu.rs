@@ -20,7 +20,7 @@ const IO_REGISTERS_SIZE: usize = 160; // Bytes
 const INITIAL_P1: u8 = 0xCF;
 const INITIAL_SB: u8 = 0x00;
 const INITIAL_SC: u8 = 0x7E;
-const INITIAL_DIV: u8 = 0x18;
+pub const INITIAL_DIV: u8 = 0x18;
 const INITIAL_TIMA: u8 = 0x00;
 const INITIAL_TMA: u8 = 0x00;
 const INITIAL_TAC: u8 = 0xF8;
@@ -57,6 +57,12 @@ const INITIAL_BGP: u8 = 0xFC;
 const INITIAL_WY: u8 = 0x00;
 const INITIAL_WX: u8 = 0x00;
 const INITIAL_IE: u8 = 0x00;
+
+// Important addresses
+pub const DIV_ADDRESS: u16 = 0xFF04;
+pub const TIMA_ADDRESS: u16 = 0xFF05;
+pub const TMA_ADDRESS: u16 = 0xFF06;
+pub const TAC_ADDRESS: u16 = 0xFF07;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MMU {
@@ -184,6 +190,11 @@ impl MMU {
         let msb = self.read(address.wrapping_add(1));
         construct_u16(lsb, msb)
     }
+
+    pub fn timer_update_div(&mut self, value: u8) {
+        let div_index = DIV_ADDRESS - 0xFF00;
+        self.io_registers[div_index as usize] = value;
+    }
 }
 
 /// Memory access functions
@@ -251,7 +262,13 @@ impl MMU {
     }
 
     fn set_io_register(&mut self, index: u16, value: u8) {
-        self.io_registers[index as usize] = value;
+        let div_index: u16 = 0xFF04 - 0xFF00;
+        if index == div_index {
+            // Write to DIV, reset it
+            self.io_registers[div_index as usize] = 0;
+        } else {
+            self.io_registers[index as usize] = value;
+        }
     }
 
     fn get_hram(&self, index: u16) -> u8 {

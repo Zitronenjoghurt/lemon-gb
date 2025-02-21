@@ -23,3 +23,13 @@ pub fn construct_u16(lsb: u8, msb: u8) -> u16 {
 pub fn deconstruct_u16(value: u16) -> (u8, u8) {
     (value as u8, (value >> 8) as u8)
 }
+
+/// Bits are indexed right to left starting from 0
+pub fn get_bit_u8(value: u8, bit_index: usize) -> bool {
+    (value >> bit_index) & 1 == 1
+}
+
+/// Bits are indexed right to left starting from 0
+pub fn get_bit_u16(value: u16, bit_index: usize) -> bool {
+    (value >> bit_index) & 1 == 1
+}

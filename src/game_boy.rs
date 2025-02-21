@@ -1,6 +1,7 @@
 use crate::game_boy::components::cartridge::Cartridge;
 use crate::game_boy::components::cpu::CPU;
 use crate::game_boy::components::mmu::MMU;
+use crate::game_boy::components::timer::Timer;
 
 pub mod components;
 
@@ -11,6 +12,7 @@ pub struct GameBoy {
     /// Memory Management Unit
     /// Handles all memory storage and access
     mmu: MMU,
+    timer: Timer,
 }
 
 impl GameBoy {
@@ -18,6 +20,13 @@ impl GameBoy {
         Self {
             cpu: CPU::initialize(),
             mmu: MMU::initialize(cartridge),
+            timer: Timer::initialize(),
         }
+    }
+
+    pub fn step(&mut self) -> u8 {
+        let m = self.cpu.step(&mut self.mmu);
+        self.timer.step(m, &mut self.mmu);
+        m
     }
 }
