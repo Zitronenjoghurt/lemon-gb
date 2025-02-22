@@ -30,6 +30,8 @@ pub enum Instruction {
     LoadR16A(R16Mem),
     /// Loads the following 2 bytes into the specified register
     LoadR16Imm16(R16),
+    /// Loads the following byte into the specified register
+    LoadR8Imm8(R8),
     /// Load the value at the top of the stack into the address specified by the following 2 bytes
     LoadImm16SP,
     /// Does nothing, will stall a cycle
@@ -58,38 +60,46 @@ impl Instruction {
             0b0000_0011 => Ok(Instruction::IncR16(R16::BC)),       // 0x03
             0b0000_0100 => Ok(Instruction::IncR8(R8::B)),          // 0x04
             0b0000_0101 => Ok(Instruction::DecR8(R8::B)),          // 0x05
+            0b0000_0110 => Ok(Instruction::LoadR8Imm8(R8::B)),     // 0x06
             0b0000_1000 => Ok(Instruction::LoadImm16SP),           // 0x08
             0b0000_1010 => Ok(Instruction::LoadAR16(R16Mem::BC)),  // 0x0A
             0b0000_1011 => Ok(Instruction::DecR16(R16::BC)),       // 0x0B
             0b0000_1100 => Ok(Instruction::IncR8(R8::C)),          // 0x0C
             0b0000_1101 => Ok(Instruction::DecR8(R8::C)),          // 0x0D
+            0b0000_1110 => Ok(Instruction::LoadR8Imm8(R8::C)),     // 0x0E
             0b0001_0001 => Ok(Instruction::LoadR16Imm16(R16::DE)), // 0x11
             0b0001_0010 => Ok(Instruction::LoadR16A(R16Mem::DE)),  // 0x12
             0b0001_0011 => Ok(Instruction::IncR16(R16::DE)),       // 0x13
             0b0001_0100 => Ok(Instruction::IncR8(R8::D)),          // 0x14
             0b0001_0101 => Ok(Instruction::DecR8(R8::D)),          // 0x15
+            0b0001_0110 => Ok(Instruction::LoadR8Imm8(R8::D)),     // 0x16
             0b0001_1010 => Ok(Instruction::LoadAR16(R16Mem::DE)),  // 0x1A
             0b0001_1011 => Ok(Instruction::DecR16(R16::DE)),       // 0x1B
             0b0001_1100 => Ok(Instruction::IncR8(R8::E)),          // 0x1C
             0b0001_1101 => Ok(Instruction::DecR8(R8::E)),          // 0x1D
+            0b0001_1110 => Ok(Instruction::LoadR8Imm8(R8::E)),     // 0x1E
             0b0010_0001 => Ok(Instruction::LoadR16Imm16(R16::HL)), // 0x21
             0b0010_0010 => Ok(Instruction::LoadR16A(R16Mem::HLI)), // 0x22
             0b0010_0011 => Ok(Instruction::IncR16(R16::HL)),       // 0x23
             0b0010_0100 => Ok(Instruction::IncR8(R8::H)),          // 0x24
             0b0010_0101 => Ok(Instruction::DecR8(R8::H)),          // 0x25
+            0b0010_0110 => Ok(Instruction::LoadR8Imm8(R8::H)),     // 0x26
             0b0010_1010 => Ok(Instruction::LoadAR16(R16Mem::HLI)), // 0x2A
             0b0010_1011 => Ok(Instruction::DecR16(R16::HL)),       // 0x2B
             0b0010_1100 => Ok(Instruction::IncR8(R8::L)),          // 0x2C
             0b0010_1101 => Ok(Instruction::DecR8(R8::L)),          // 0x2D
+            0b0010_1110 => Ok(Instruction::LoadR8Imm8(R8::L)),     // 0x2E
             0b0011_0001 => Ok(Instruction::LoadR16Imm16(R16::SP)), // 0x31
             0b0011_0010 => Ok(Instruction::LoadR16A(R16Mem::HLD)), // 0x32
             0b0011_0011 => Ok(Instruction::IncR16(R16::SP)),       // 0x33
             0b0011_0100 => Ok(Instruction::IncR8(R8::HL)),         // 0x34
             0b0011_0101 => Ok(Instruction::DecR8(R8::HL)),         // 0x35
+            0b0011_0110 => Ok(Instruction::LoadR8Imm8(R8::HL)),    // 0x36
             0b0011_1010 => Ok(Instruction::LoadAR16(R16Mem::HLD)), // 0x3A
             0b0011_1011 => Ok(Instruction::DecR16(R16::SP)),       // 0x3B
             0b0011_1100 => Ok(Instruction::IncR8(R8::A)),          // 0x3C
             0b0011_1101 => Ok(Instruction::DecR8(R8::A)),          // 0x3D
+            0b0011_1110 => Ok(Instruction::LoadR8Imm8(R8::A)),     // 0x3E
             0b1000_0000 => Ok(Instruction::Add(R8::B)),            // 0x80
             0b1000_0001 => Ok(Instruction::Add(R8::C)),            // 0x81
             0b1000_0010 => Ok(Instruction::Add(R8::D)),            // 0x82
@@ -124,7 +134,6 @@ impl Instruction {
 
     pub fn get_length(&self) -> usize {
         match self {
-            Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
             Self::Nop
             | Self::Add(_)
             | Self::JpHL
@@ -136,6 +145,8 @@ impl Instruction {
             | Self::DecR16(_)
             | Self::IncR8(_)
             | Self::DecR8(_) => 1,
+            Self::LoadR8Imm8(_) => 2,
+            Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
     }
 
@@ -190,6 +201,7 @@ impl Instruction {
             Self::LoadAR16(r16_mem) => format!("LD A, {r16_mem}"),
             Self::LoadR16A(r16_mem) => format!("LD {r16_mem}, A"),
             Self::LoadR16Imm16(r16) => format!("LD {r16}, 0x{:02X}{:02X}", msb, lsb),
+            Self::LoadR8Imm8(r8) => format!("LD {r8}, 0x{:02X}", msb),
             Self::LoadImm16SP => format!("LD 0x{:02X}{:02X}, SP", msb, lsb),
             Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
             Self::PushR16(r16_stack) => format!("PUSH {r16_stack}"),
@@ -235,6 +247,9 @@ impl Instruction {
             }
             Self::LoadR16Imm16(r16) => {
                 format!("Load 0x{:02X}{:02X} into register {r16}", msb, lsb)
+            }
+            Self::LoadR8Imm8(r8) => {
+                format!("Load 0x{:02X} into register {r8}", msb)
             }
             Self::LoadImm16SP => {
                 format!(

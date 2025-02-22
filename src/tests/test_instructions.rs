@@ -445,6 +445,50 @@ fn test_ld_imm16_sp(
     assert_eq!(mmu.read(address + 1), value_msb);
 }
 
+/// LOAD r8 imm8 (except HL)
+#[rstest]
+#[case::load_b(0x06, 0xF5)]
+#[case::load_c(0x0E, 0xF5)]
+#[case::load_d(0x16, 0xF5)]
+#[case::load_e(0x1E, 0xF5)]
+#[case::load_h(0x26, 0xF5)]
+#[case::load_l(0x2E, 0xF5)]
+#[case::load_a(0x3E, 0xF5)]
+fn test_ld_r8_imm8(#[case] opcode: u8, #[case] value: u8) {
+    let mut mmu = MMU::builder().rom(0, opcode).rom(1, value).build();
+    let mut cpu = CPU::default();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 2);
+
+    match opcode {
+        0x06 => assert_eq!(cpu.get_b(), value),
+        0x0E => assert_eq!(cpu.get_c(), value),
+        0x16 => assert_eq!(cpu.get_d(), value),
+        0x1E => assert_eq!(cpu.get_e(), value),
+        0x26 => assert_eq!(cpu.get_h(), value),
+        0x2E => assert_eq!(cpu.get_l(), value),
+        0x3E => assert_eq!(cpu.get_a(), value),
+        _ => panic!("Unexpected opcode"),
+    }
+}
+
+/// LD HL IMM8 (0x36)
+#[test]
+fn test_ld_hl_imm8() {
+    const ADDRESS: u16 = 0xC000;
+    const VALUE: u8 = 0xF5;
+
+    let mut mmu = MMU::builder().rom(0, 0x36).rom(1, VALUE).build();
+    let mut cpu = CPU::builder().hl(ADDRESS).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 3);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(mmu.read(ADDRESS), VALUE);
+}
+
 /// LOAD r16 imm16
 #[rstest]
 #[case::bc_load(0x01, 0x37, 0x13, 0x1337)]

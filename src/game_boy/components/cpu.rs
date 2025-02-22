@@ -47,6 +47,7 @@ impl CPU {
             Instruction::LoadAR16(r16_mem) => self.load_a_r16m(r16_mem, mmu),
             Instruction::LoadR16A(r16_mem) => self.load_r16m_a(r16_mem, mmu),
             Instruction::LoadR16Imm16(r16) => self.load_r16_imm(r16, mmu),
+            Instruction::LoadR8Imm8(r8) => self.load_r8_imm8(r8, mmu),
             Instruction::LoadImm16SP => self.load_imm16_sp(mmu),
             Instruction::Nop => self.instruction_result(1, 1),
             Instruction::PopR16(r16_stack) => self.pop_r16(r16_stack, mmu),
@@ -136,6 +137,14 @@ impl CPU {
 
         self.process_r16m_register_update(r16_m);
         self.instruction_result(1, 2)
+    }
+
+    pub fn load_r8_imm8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.read_next_imm8(mmu);
+        self.set_r8(r8, value, mmu);
+
+        let m = if r8 == R8::HL { 3 } else { 2 };
+        self.instruction_result(2, m)
     }
 
     pub fn load_imm16_sp(&mut self, mmu: &mut MMU) -> (u16, u8) {

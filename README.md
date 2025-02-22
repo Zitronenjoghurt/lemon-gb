@@ -21,3 +21,26 @@ The sources I have used to create this emulator.
     - Detailed CPU explanations
 - https://hacktix.github.io/GBEDG/
     - Even more detailed information especially for the PPU and timer
+
+# Current State
+
+WORK IN PROGRESS, not launchable yet
+
+### Components
+
+- 🚧 CPU (69/501 Instructions)
+- ✅ Timer
+- 🚧 MMU (see memory banking)
+- ❌ PPU
+- ❌ APU
+
+### Memory Banking
+
+- ✅ No MBC
+- ✅ MBC1
+- ❌ MBC2
+- ❌ MBC3
+- ❌ MBC5
+- ❌ MBC6
+- ❌ MBC7
+- ❌ ... (others)
