@@ -14,8 +14,13 @@ impl MMUBuilder {
         self.mmu
     }
 
-    pub fn set(mut self, address: u16, value: u8) -> Self {
+    pub fn write(mut self, address: u16, value: u8) -> Self {
         self.mmu.write(address, value);
+        self
+    }
+
+    pub fn rom(mut self, address: u16, value: u8) -> Self {
+        self.mmu.force_write_rom(address, value);
         self
     }
 }

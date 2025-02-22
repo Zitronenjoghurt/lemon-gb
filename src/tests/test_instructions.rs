@@ -7,7 +7,7 @@ use rstest::rstest;
 /// NOP (0x00)
 #[test]
 fn test_nop() {
-    let mut mmu = MMU::builder().set(0, 0x00).build();
+    let mut mmu = MMU::builder().rom(0, 0x00).build();
     let mut cpu = CPU::default();
 
     let m = cpu.step(&mut mmu);
@@ -28,9 +28,9 @@ fn test_ld_r16_imm16(
     #[case] expected_value: u16,
 ) {
     let mut mmu = MMU::builder()
-        .set(0, opcode)
-        .set(1, imm1)
-        .set(2, imm2)
+        .rom(0, opcode)
+        .rom(1, imm1)
+        .rom(2, imm2)
         .build();
     let mut cpu = CPU::default();
     let m = cpu.step(&mut mmu);
@@ -137,7 +137,7 @@ fn test_add_register(
     #[case] expected_hc: bool,
     #[case] expected_c: bool,
 ) {
-    let mut mmu = MMU::builder().set(0, opcode).build();
+    let mut mmu = MMU::builder().rom(0, opcode).build();
     let mut cpu = CPU::builder()
         .a(a)
         .b(if opcode == 0x80 { value } else { 0 })
@@ -184,7 +184,7 @@ fn test_add_hl(
 ) {
     const ADDRESS: u16 = 0xAB;
 
-    let mut mmu = MMU::builder().set(0, 0x86).set(ADDRESS, value).build();
+    let mut mmu = MMU::builder().rom(0, 0x86).rom(ADDRESS, value).build();
     let mut cpu = CPU::builder().a(a).hl(ADDRESS).build();
     let m = cpu.step(&mut mmu);
 
@@ -215,7 +215,7 @@ fn test_add_a(
     #[case] expected_hc: bool,
     #[case] expected_c: bool,
 ) {
-    let mut mmu = MMU::builder().set(0, 0x87).build();
+    let mut mmu = MMU::builder().rom(0, 0x87).build();
     let mut cpu = CPU::builder().a(a).build();
     let m = cpu.step(&mut mmu);
 
@@ -235,9 +235,9 @@ fn test_add_a(
 #[case::jump_to_end(0xFF, 0xFF, 0xFFFF)]
 fn test_jump_imm16(#[case] imm1: u8, #[case] imm2: u8, #[case] expected_pc: u16) {
     let mut mmu = MMU::builder()
-        .set(0, 0xC3)
-        .set(1, imm1)
-        .set(2, imm2)
+        .rom(0, 0xC3)
+        .rom(1, imm1)
+        .rom(2, imm2)
         .build();
     let mut cpu = CPU::default();
 
@@ -266,9 +266,9 @@ fn test_jump_cond_imm16(
     #[case] expected_m: u8,
 ) {
     let mut mmu = MMU::builder()
-        .set(0, opcode)
-        .set(1, imm1)
-        .set(2, imm2)
+        .rom(0, opcode)
+        .rom(1, imm1)
+        .rom(2, imm2)
         .build();
     let mut cpu = CPU::builder().f_zero(f_zero).f_carry(f_carry).build();
     let m = cpu.step(&mut mmu);
@@ -281,7 +281,7 @@ fn test_jump_cond_imm16(
 #[rstest]
 #[case::basic_jump(0x1337)]
 fn test_jump_hl(#[case] target_address: u16) {
-    let mut mmu = MMU::builder().set(0, 0xE9).build();
+    let mut mmu = MMU::builder().rom(0, 0xE9).build();
     let mut cpu = CPU::builder().hl(target_address).build();
     let m = cpu.step(&mut mmu);
 
@@ -302,7 +302,7 @@ fn test_push_r16(
     #[case] push_value: u16,
     #[case] expected_value: u16,
 ) {
-    let mut mmu = MMU::builder().set(0, opcode).build();
+    let mut mmu = MMU::builder().rom(0, opcode).build();
     let mut cpu = CPU::builder()
         .sp(sp)
         .bc(if opcode == 0xC5 { push_value } else { 0 })
@@ -333,9 +333,9 @@ fn test_pop_r16(
     #[case] expected_value: u16,
 ) {
     let mut mmu = MMU::builder()
-        .set(0, opcode)
-        .set(sp, imm1)
-        .set(sp + 1, imm2)
+        .rom(0, opcode)
+        .write(sp, imm1)
+        .write(sp + 1, imm2)
         .build();
     let mut cpu = CPU::builder().sp(sp).build();
     let m = cpu.step(&mut mmu);

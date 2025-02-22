@@ -195,6 +195,19 @@ impl MMU {
         let div_index = DIV_ADDRESS - 0xFF00;
         self.io_registers[div_index as usize] = value;
     }
+
+    pub fn force_write_rom(&mut self, address: u16, value: u8) {
+        match address {
+            0x0000..=0x3FFF => {
+                self.rom_banks[self.mbc.get_lower_rom_index()][address as usize] = value
+            }
+            0x4000..=0x7FFF => {
+                let index = address - 0x4000;
+                self.rom_banks[self.mbc.get_upper_rom_index()][index as usize] = value
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Memory access functions
@@ -204,9 +217,10 @@ impl MMU {
         self.rom_banks[bank][index as usize]
     }
 
-    fn set_rom(&mut self, bank: usize, index: u16, value: u8) {
+    fn set_rom(&mut self, _bank: usize, index: u16, value: u8) {
         self.mbc.handle_write(index, value);
-        self.rom_banks[bank][index as usize] = value;
+        // We won't write to ROM anymore
+        // self.rom_banks[bank][index as usize] = value;
     }
 
     fn get_vram(&self, index: u16) -> u8 {
