@@ -2,6 +2,7 @@ use crate::game_boy::components::cpu::registers::builder::CPURegistersBuilderTra
 use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
 use crate::game_boy::components::cpu::CPU;
 use crate::game_boy::components::mmu::MMU;
+use crate::helpers::bit_operations::construct_u16;
 use rstest::rstest;
 
 /// NOP (0x00)
@@ -13,6 +14,96 @@ fn test_nop() {
     let m = cpu.step(&mut mmu);
     assert_eq!(cpu.get_pc(), 1);
     assert_eq!(m, 1);
+}
+
+/// Load A r16
+#[rstest]
+#[case::bc_load(0x0A, 0xC337, 0x5A)]
+#[case::de_load(0x1A, 0xC337, 0x5A)]
+#[case::hli_load(0x2A, 0xC337, 0x5A)]
+#[case::hld_load(0x3A, 0xC337, 0x5A)]
+fn test_ld_a_r16(#[case] opcode: u8, #[case] address: u16, #[case] value: u8) {
+    let mut mmu = MMU::builder().rom(0, opcode).write(address, value).build();
+    let mut cpu = CPU::builder()
+        .a(value)
+        .bc(if opcode == 0x0A { address } else { 0 })
+        .de(if opcode == 0x1A { address } else { 0 })
+        .hl(if opcode == 0x2A || opcode == 0x3A {
+            address
+        } else {
+            0
+        })
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), value);
+
+    if opcode == 0x2A {
+        assert_eq!(cpu.get_hl(), address + 1);
+    } else if opcode == 0x3A {
+        assert_eq!(cpu.get_hl(), address - 1);
+    }
+}
+
+/// Load r16 A
+#[rstest]
+#[case::bc_load(0x02, 0xC337, 0x5A)]
+#[case::de_load(0x12, 0xC337, 0x5A)]
+#[case::hli_load(0x22, 0xC337, 0x5A)]
+#[case::hld_load(0x32, 0xC337, 0x5A)]
+fn test_ld_r16_a(#[case] opcode: u8, #[case] address: u16, #[case] value: u8) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .a(value)
+        .bc(if opcode == 0x02 { address } else { 0 })
+        .de(if opcode == 0x12 { address } else { 0 })
+        .hl(if opcode == 0x22 || opcode == 0x32 {
+            address
+        } else {
+            0
+        })
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(mmu.read(address), value);
+
+    if opcode == 0x22 {
+        assert_eq!(cpu.get_hl(), address + 1);
+    } else if opcode == 0x32 {
+        assert_eq!(cpu.get_hl(), address - 1);
+    }
+}
+
+/// LOAD imm16 SP (0x08)
+#[rstest]
+#[case::basic_load(0xFFFE, 0x37, 0x13, 0x00, 0xC0)]
+fn test_ld_imm16_sp(
+    #[case] sp: u16,
+    #[case] value_lsb: u8,
+    #[case] value_msb: u8,
+    #[case] addr_lsb: u8,
+    #[case] addr_msb: u8,
+) {
+    let mut mmu = MMU::builder()
+        .rom(0, 0x08)
+        .rom(1, addr_lsb)
+        .rom(2, addr_msb)
+        .write(sp, value_lsb)
+        .write(sp + 1, value_msb)
+        .build();
+    let mut cpu = CPU::builder().sp(sp).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 5);
+    assert_eq!(cpu.get_pc(), 3);
+
+    let address = construct_u16(addr_lsb, addr_msb);
+    assert_eq!(mmu.read(address), value_lsb);
+    assert_eq!(mmu.read(address + 1), value_msb);
 }
 
 /// LOAD r16 imm16

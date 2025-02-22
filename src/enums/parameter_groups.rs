@@ -69,6 +69,25 @@ impl Display for R16Stack {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+pub enum R16Mem {
+    BC = 0,
+    DE = 1,
+    HLI = 2, // HL Increment (HL+)
+    HLD = 3, // HL Decrement (HL-)
+}
+
+impl Display for R16Mem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            R16Mem::BC => write!(f, "BC"),
+            R16Mem::DE => write!(f, "DE"),
+            R16Mem::HLI => write!(f, "HL+"),
+            R16Mem::HLD => write!(f, "HL-"),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum JumpCondition {
     NotZero = 0,
     Zero = 1,

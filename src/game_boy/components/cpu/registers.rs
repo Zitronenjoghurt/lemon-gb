@@ -1,4 +1,4 @@
-use crate::enums::parameter_groups::{JumpCondition, R16Stack, R16, R8};
+use crate::enums::parameter_groups::{JumpCondition, R16Mem, R16Stack, R16, R8};
 use crate::game_boy::components::cpu::registers::builder::CPURegistersBuilder;
 use crate::game_boy::components::cpu::registers::flags_register::CPUFlagsRegister;
 use crate::game_boy::components::mmu::MMU;
@@ -107,6 +107,14 @@ pub trait CpuRegistersAccessTrait {
             R16Stack::DE => self.set_de(value),
             R16Stack::HL => self.set_hl(value),
             R16Stack::AF => self.set_af(value),
+        }
+    }
+
+    fn get_r16_mem(&self, register: R16Mem) -> u16 {
+        match register {
+            R16Mem::BC => self.get_bc(),
+            R16Mem::DE => self.get_de(),
+            R16Mem::HLI | R16Mem::HLD => self.get_hl(),
         }
     }
 

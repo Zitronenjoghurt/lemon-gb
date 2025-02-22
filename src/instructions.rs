@@ -1,7 +1,6 @@
-use crate::enums::parameter_groups::{JumpCondition, R16Stack, R16, R8};
+use crate::enums::parameter_groups::{JumpCondition, R16Mem, R16Stack, R16, R8};
 use crate::game_boy::components::cpu::PREFIX_INSTRUCTION_BYTE;
 use std::error::Error;
-use std::fmt::Display;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Instruction {
@@ -13,8 +12,18 @@ pub enum Instruction {
     JpImm16,
     /// Conditional jump to the address specified in the following 2 bytes
     JpCondImm16(JumpCondition),
+    /// Loads the value from the address stored in the provided register into register A
+    /// For HL-, HL is decremented after the operation
+    /// For HL+, HL is incremented after the operation
+    LoadAR16(R16Mem),
+    /// Loads the value in register A into the address stored in the provided register
+    /// For HL-, HL is decremented after the operation
+    /// For HL+, HL is incremented after the operation
+    LoadR16A(R16Mem),
     /// Loads the following 2 bytes into the specified register
     LoadR16Imm16(R16),
+    /// Load the value at the top of the stack into the address specified by the following 2 bytes
+    LoadImm16SP,
     /// Does nothing, will stall a cycle
     #[default]
     Nop,
@@ -37,9 +46,18 @@ impl Instruction {
         match byte {
             0b0000_0000 => Ok(Instruction::Nop),                   // 0x00
             0b0000_0001 => Ok(Instruction::LoadR16Imm16(R16::BC)), // 0x01
+            0b0000_0010 => Ok(Instruction::LoadR16A(R16Mem::BC)),  // 0x02
+            0b0000_1000 => Ok(Instruction::LoadImm16SP),           // 0x08
+            0b0000_1010 => Ok(Instruction::LoadAR16(R16Mem::BC)),  // 0x0A
             0b0001_0001 => Ok(Instruction::LoadR16Imm16(R16::DE)), // 0x11
+            0b0001_0010 => Ok(Instruction::LoadR16A(R16Mem::DE)),  // 0x12
+            0b0001_1010 => Ok(Instruction::LoadAR16(R16Mem::DE)),  // 0x1A
             0b0010_0001 => Ok(Instruction::LoadR16Imm16(R16::HL)), // 0x21
+            0b0010_0010 => Ok(Instruction::LoadR16A(R16Mem::HLI)), // 0x22
+            0b0010_1010 => Ok(Instruction::LoadAR16(R16Mem::HLI)), // 0x2A
             0b0011_0001 => Ok(Instruction::LoadR16Imm16(R16::SP)), // 0x31
+            0b0011_0010 => Ok(Instruction::LoadR16A(R16Mem::HLD)), // 0x32
+            0b0011_1010 => Ok(Instruction::LoadAR16(R16Mem::HLD)), // 0x3A
             0b1000_0000 => Ok(Instruction::Add(R8::B)),            // 0x80
             0b1000_0001 => Ok(Instruction::Add(R8::C)),            // 0x81
             0b1000_0010 => Ok(Instruction::Add(R8::D)),            // 0x82
@@ -74,8 +92,14 @@ impl Instruction {
 
     pub fn get_length(&self) -> usize {
         match self {
-            Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) => 3,
-            Self::Nop | Self::Add(_) | Self::JpHL | Self::PopR16(_) | Self::PushR16(_) => 1,
+            Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
+            Self::Nop
+            | Self::Add(_)
+            | Self::JpHL
+            | Self::PopR16(_)
+            | Self::PushR16(_)
+            | Self::LoadR16A(_)
+            | Self::LoadAR16(_) => 1,
         }
     }
 
@@ -123,7 +147,10 @@ impl Instruction {
             Self::JpHL => "JP HL".into(),
             Self::JpImm16 => format!("JP 0x{:02X}{:02X}", msb, lsb),
             Self::JpCondImm16(cond) => format!("JP {cond}, 0x{:02X}{:02X}", msb, lsb),
+            Self::LoadAR16(r16_mem) => format!("LD A, {r16_mem}"),
+            Self::LoadR16A(r16_mem) => format!("LD {r16_mem}, A"),
             Self::LoadR16Imm16(r16) => format!("LD {r16}, 0x{:02X}{:02X}", msb, lsb),
+            Self::LoadImm16SP => format!("LD 0x{:02X}{:02X}, SP", msb, lsb),
             Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
             Self::PushR16(r16_stack) => format!("PUSH {r16_stack}"),
         }
@@ -144,8 +171,32 @@ impl Instruction {
                     lsb
                 )
             }
+            Self::LoadAR16(r16_mem) => {
+                let extra = match r16_mem {
+                    R16Mem::HLD => "; Decrement HL",
+                    R16Mem::HLI => "; Increment HL",
+                    _ => "",
+                };
+                format!("Load value from the address stored in register {r16_mem} into register A{extra}")
+            }
+            Self::LoadR16A(r16_mem) => {
+                let extra = match r16_mem {
+                    R16Mem::HLD => "; Decrement HL",
+                    R16Mem::HLI => "; Increment HL",
+                    _ => "",
+                };
+                format!(
+                    "Load value from register A into address stored at register {r16_mem}{extra}"
+                )
+            }
             Self::LoadR16Imm16(r16) => {
                 format!("Load 0x{:02X}{:02X} into register {r16}", msb, lsb)
+            }
+            Self::LoadImm16SP => {
+                format!(
+                    "Load value from the top of the stack into address 0x{:02X}{:02X}",
+                    msb, lsb
+                )
             }
             Self::PopR16(r16_stack) => format!("Pop value from stack into register {r16_stack}"),
             Self::PushR16(r16_stack) => format!("Push value in {r16_stack} onto the stack"),

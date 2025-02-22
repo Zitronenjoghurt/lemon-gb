@@ -1,4 +1,4 @@
-use crate::enums::parameter_groups::{JumpCondition, R16};
+use crate::enums::parameter_groups::{JumpCondition, R16Mem, R16};
 use crate::enums::parameter_groups::{R16Stack, R8};
 use crate::game_boy::components::cpu::builder::CpuBuilder;
 use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
@@ -40,7 +40,10 @@ impl CPU {
             Instruction::JpHL => self.jump_hl(),
             Instruction::JpImm16 => self.jump_imm(mmu),
             Instruction::JpCondImm16(condition) => self.jump_condition_imm(condition, mmu),
+            Instruction::LoadAR16(r16_mem) => self.load_a_r16m(r16_mem, mmu),
+            Instruction::LoadR16A(r16_mem) => self.load_r16m_a(r16_mem, mmu),
             Instruction::LoadR16Imm16(r16) => self.load_r16_imm(r16, mmu),
+            Instruction::LoadImm16SP => self.load_imm16_sp(mmu),
             Instruction::Nop => self.instruction_result(1, 1),
             Instruction::PopR16(r16_stack) => self.pop_r16(r16_stack, mmu),
             Instruction::PushR16(r16_stack) => self.push_r16(r16_stack, mmu),
@@ -72,6 +75,34 @@ impl CPU {
         let value = self.read_next_imm16(mmu);
         self.set_r16(r16, value);
         self.instruction_result(3, 3)
+    }
+
+    pub fn load_a_r16m(&mut self, r16_m: R16Mem, mmu: &mut MMU) -> (u16, u8) {
+        let address = self.get_r16_mem(r16_m);
+        let value = mmu.read(address);
+        self.set_a(value);
+
+        self.process_r16m_register_update(r16_m);
+        self.instruction_result(1, 2)
+    }
+
+    pub fn load_r16m_a(&mut self, r16_m: R16Mem, mmu: &mut MMU) -> (u16, u8) {
+        let address = self.get_r16_mem(r16_m);
+        let value = self.get_a();
+        mmu.write(address, value);
+
+        self.process_r16m_register_update(r16_m);
+        self.instruction_result(1, 2)
+    }
+
+    pub fn load_imm16_sp(&mut self, mmu: &mut MMU) -> (u16, u8) {
+        let address = self.read_next_imm16(mmu);
+        let value_lsb = mmu.read(self.get_sp());
+        let value_msb = mmu.read(self.get_sp().wrapping_add(1));
+        mmu.write(address, value_lsb);
+        mmu.write(address.wrapping_add(1), value_msb);
+
+        self.instruction_result(3, 5)
     }
 
     pub fn add(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
@@ -150,6 +181,14 @@ impl CPU {
 
     fn read_next_imm16(&self, mmu: &MMU) -> u16 {
         mmu.read_16(self.get_pc().wrapping_add(1))
+    }
+
+    fn process_r16m_register_update(&mut self, r16_m: R16Mem) {
+        if r16_m == R16Mem::HLI {
+            self.set_hl(self.get_hl().wrapping_add(1));
+        } else if r16_m == R16Mem::HLD {
+            self.set_hl(self.get_hl().wrapping_sub(1));
+        }
     }
 }
 
