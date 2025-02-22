@@ -83,6 +83,28 @@ pub trait CpuRegistersAccessTrait {
         }
     }
 
+    fn set_r8(&mut self, register: R8, value: u8, mmu: &mut MMU) {
+        match register {
+            R8::B => self.set_b(value),
+            R8::C => self.set_c(value),
+            R8::D => self.set_d(value),
+            R8::E => self.set_e(value),
+            R8::H => self.set_h(value),
+            R8::L => self.set_l(value),
+            R8::HL => mmu.write(self.get_hl(), value),
+            R8::A => self.set_a(value),
+        }
+    }
+
+    fn get_r16(&self, register: R16) -> u16 {
+        match register {
+            R16::BC => self.get_bc(),
+            R16::DE => self.get_de(),
+            R16::HL => self.get_hl(),
+            R16::SP => self.get_sp(),
+        }
+    }
+
     fn set_r16(&mut self, register: R16, value: u16) {
         match register {
             R16::BC => self.set_bc(value),

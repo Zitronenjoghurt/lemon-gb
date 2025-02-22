@@ -6,6 +6,14 @@ use std::error::Error;
 pub enum Instruction {
     /// Add the specified register to register A
     Add(R8),
+    /// Decrement the specified register
+    DecR8(R8),
+    /// Decrement the specified register
+    DecR16(R16),
+    /// Increment the specified register
+    IncR8(R8),
+    /// Increment the specified register
+    IncR16(R16),
     /// Unconditional jump to the address specified in the HL register
     JpHL,
     /// Unconditional jump to the address specified in the following 2 bytes
@@ -47,17 +55,41 @@ impl Instruction {
             0b0000_0000 => Ok(Instruction::Nop),                   // 0x00
             0b0000_0001 => Ok(Instruction::LoadR16Imm16(R16::BC)), // 0x01
             0b0000_0010 => Ok(Instruction::LoadR16A(R16Mem::BC)),  // 0x02
+            0b0000_0011 => Ok(Instruction::IncR16(R16::BC)),       // 0x03
+            0b0000_0100 => Ok(Instruction::IncR8(R8::B)),          // 0x04
+            0b0000_0101 => Ok(Instruction::DecR8(R8::B)),          // 0x05
             0b0000_1000 => Ok(Instruction::LoadImm16SP),           // 0x08
             0b0000_1010 => Ok(Instruction::LoadAR16(R16Mem::BC)),  // 0x0A
+            0b0000_1011 => Ok(Instruction::DecR16(R16::BC)),       // 0x0B
+            0b0000_1100 => Ok(Instruction::IncR8(R8::C)),          // 0x0C
+            0b0000_1101 => Ok(Instruction::DecR8(R8::C)),          // 0x0D
             0b0001_0001 => Ok(Instruction::LoadR16Imm16(R16::DE)), // 0x11
             0b0001_0010 => Ok(Instruction::LoadR16A(R16Mem::DE)),  // 0x12
+            0b0001_0011 => Ok(Instruction::IncR16(R16::DE)),       // 0x13
+            0b0001_0100 => Ok(Instruction::IncR8(R8::D)),          // 0x14
+            0b0001_0101 => Ok(Instruction::DecR8(R8::D)),          // 0x15
             0b0001_1010 => Ok(Instruction::LoadAR16(R16Mem::DE)),  // 0x1A
+            0b0001_1011 => Ok(Instruction::DecR16(R16::DE)),       // 0x1B
+            0b0001_1100 => Ok(Instruction::IncR8(R8::E)),          // 0x1C
+            0b0001_1101 => Ok(Instruction::DecR8(R8::E)),          // 0x1D
             0b0010_0001 => Ok(Instruction::LoadR16Imm16(R16::HL)), // 0x21
             0b0010_0010 => Ok(Instruction::LoadR16A(R16Mem::HLI)), // 0x22
+            0b0010_0011 => Ok(Instruction::IncR16(R16::HL)),       // 0x23
+            0b0010_0100 => Ok(Instruction::IncR8(R8::H)),          // 0x24
+            0b0010_0101 => Ok(Instruction::DecR8(R8::H)),          // 0x25
             0b0010_1010 => Ok(Instruction::LoadAR16(R16Mem::HLI)), // 0x2A
+            0b0010_1011 => Ok(Instruction::DecR16(R16::HL)),       // 0x2B
+            0b0010_1100 => Ok(Instruction::IncR8(R8::L)),          // 0x2C
+            0b0010_1101 => Ok(Instruction::DecR8(R8::L)),          // 0x2D
             0b0011_0001 => Ok(Instruction::LoadR16Imm16(R16::SP)), // 0x31
             0b0011_0010 => Ok(Instruction::LoadR16A(R16Mem::HLD)), // 0x32
+            0b0011_0011 => Ok(Instruction::IncR16(R16::SP)),       // 0x33
+            0b0011_0100 => Ok(Instruction::IncR8(R8::HL)),         // 0x34
+            0b0011_0101 => Ok(Instruction::DecR8(R8::HL)),         // 0x35
             0b0011_1010 => Ok(Instruction::LoadAR16(R16Mem::HLD)), // 0x3A
+            0b0011_1011 => Ok(Instruction::DecR16(R16::SP)),       // 0x3B
+            0b0011_1100 => Ok(Instruction::IncR8(R8::A)),          // 0x3C
+            0b0011_1101 => Ok(Instruction::DecR8(R8::A)),          // 0x3D
             0b1000_0000 => Ok(Instruction::Add(R8::B)),            // 0x80
             0b1000_0001 => Ok(Instruction::Add(R8::C)),            // 0x81
             0b1000_0010 => Ok(Instruction::Add(R8::D)),            // 0x82
@@ -99,7 +131,11 @@ impl Instruction {
             | Self::PopR16(_)
             | Self::PushR16(_)
             | Self::LoadR16A(_)
-            | Self::LoadAR16(_) => 1,
+            | Self::LoadAR16(_)
+            | Self::IncR16(_)
+            | Self::DecR16(_)
+            | Self::IncR8(_)
+            | Self::DecR8(_) => 1,
         }
     }
 
@@ -144,6 +180,10 @@ impl Instruction {
         match self {
             Self::Nop => "NOP".into(),
             Self::Add(r8) => format!("ADD A, {r8}"),
+            Self::DecR8(r8) => format!("DEC {r8}"),
+            Self::DecR16(r16) => format!("DEC {r16}"),
+            Self::IncR8(r8) => format!("INC {r8}"),
+            Self::IncR16(r16) => format!("INC {r16}"),
             Self::JpHL => "JP HL".into(),
             Self::JpImm16 => format!("JP 0x{:02X}{:02X}", msb, lsb),
             Self::JpCondImm16(cond) => format!("JP {cond}, 0x{:02X}{:02X}", msb, lsb),
@@ -161,6 +201,10 @@ impl Instruction {
         match self {
             Self::Nop => "No Operation".into(),
             Self::Add(r8) => format!("Add value from register {r8} to register A"),
+            Self::DecR8(r8) => format!("Decrement register {r8}"),
+            Self::DecR16(r16) => format!("Decrement register {r16}"),
+            Self::IncR8(r8) => format!("Increment register {r8}"),
+            Self::IncR16(r16) => format!("Increment register {r16}"),
             Self::JpHL => "Jump to the address specified in register HL".into(),
             Self::JpImm16 => format!("Jump to address 0x{:02X}{:02X}", msb, lsb),
             Self::JpCondImm16(cond) => {
@@ -173,16 +217,16 @@ impl Instruction {
             }
             Self::LoadAR16(r16_mem) => {
                 let extra = match r16_mem {
-                    R16Mem::HLD => "; Decrement HL",
-                    R16Mem::HLI => "; Increment HL",
+                    R16Mem::HLD => "; Decrement register HL",
+                    R16Mem::HLI => "; Increment register HL",
                     _ => "",
                 };
                 format!("Load value from the address stored in register {r16_mem} into register A{extra}")
             }
             Self::LoadR16A(r16_mem) => {
                 let extra = match r16_mem {
-                    R16Mem::HLD => "; Decrement HL",
-                    R16Mem::HLI => "; Increment HL",
+                    R16Mem::HLD => "; Decrement register HL",
+                    R16Mem::HLI => "; Increment register HL",
                     _ => "",
                 };
                 format!(

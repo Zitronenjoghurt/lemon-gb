@@ -11,6 +11,7 @@ pub enum R8 {
     E = 3,
     H = 4,
     L = 5,
+    /// When this value is used as an 8-bit register, the byte HL points to is treated as the 8-Bit register
     HL = 6,
     A = 7,
 }

@@ -5,139 +5,6 @@ use crate::game_boy::components::mmu::MMU;
 use crate::helpers::bit_operations::construct_u16;
 use rstest::rstest;
 
-/// NOP (0x00)
-#[test]
-fn test_nop() {
-    let mut mmu = MMU::builder().rom(0, 0x00).build();
-    let mut cpu = CPU::default();
-
-    let m = cpu.step(&mut mmu);
-    assert_eq!(cpu.get_pc(), 1);
-    assert_eq!(m, 1);
-}
-
-/// Load A r16
-#[rstest]
-#[case::bc_load(0x0A, 0xC337, 0x5A)]
-#[case::de_load(0x1A, 0xC337, 0x5A)]
-#[case::hli_load(0x2A, 0xC337, 0x5A)]
-#[case::hld_load(0x3A, 0xC337, 0x5A)]
-fn test_ld_a_r16(#[case] opcode: u8, #[case] address: u16, #[case] value: u8) {
-    let mut mmu = MMU::builder().rom(0, opcode).write(address, value).build();
-    let mut cpu = CPU::builder()
-        .a(value)
-        .bc(if opcode == 0x0A { address } else { 0 })
-        .de(if opcode == 0x1A { address } else { 0 })
-        .hl(if opcode == 0x2A || opcode == 0x3A {
-            address
-        } else {
-            0
-        })
-        .build();
-    let m = cpu.step(&mut mmu);
-
-    assert_eq!(m, 2);
-    assert_eq!(cpu.get_pc(), 1);
-    assert_eq!(cpu.get_a(), value);
-
-    if opcode == 0x2A {
-        assert_eq!(cpu.get_hl(), address + 1);
-    } else if opcode == 0x3A {
-        assert_eq!(cpu.get_hl(), address - 1);
-    }
-}
-
-/// Load r16 A
-#[rstest]
-#[case::bc_load(0x02, 0xC337, 0x5A)]
-#[case::de_load(0x12, 0xC337, 0x5A)]
-#[case::hli_load(0x22, 0xC337, 0x5A)]
-#[case::hld_load(0x32, 0xC337, 0x5A)]
-fn test_ld_r16_a(#[case] opcode: u8, #[case] address: u16, #[case] value: u8) {
-    let mut mmu = MMU::builder().rom(0, opcode).build();
-    let mut cpu = CPU::builder()
-        .a(value)
-        .bc(if opcode == 0x02 { address } else { 0 })
-        .de(if opcode == 0x12 { address } else { 0 })
-        .hl(if opcode == 0x22 || opcode == 0x32 {
-            address
-        } else {
-            0
-        })
-        .build();
-    let m = cpu.step(&mut mmu);
-
-    assert_eq!(m, 2);
-    assert_eq!(cpu.get_pc(), 1);
-    assert_eq!(mmu.read(address), value);
-
-    if opcode == 0x22 {
-        assert_eq!(cpu.get_hl(), address + 1);
-    } else if opcode == 0x32 {
-        assert_eq!(cpu.get_hl(), address - 1);
-    }
-}
-
-/// LOAD imm16 SP (0x08)
-#[rstest]
-#[case::basic_load(0xFFFE, 0x37, 0x13, 0x00, 0xC0)]
-fn test_ld_imm16_sp(
-    #[case] sp: u16,
-    #[case] value_lsb: u8,
-    #[case] value_msb: u8,
-    #[case] addr_lsb: u8,
-    #[case] addr_msb: u8,
-) {
-    let mut mmu = MMU::builder()
-        .rom(0, 0x08)
-        .rom(1, addr_lsb)
-        .rom(2, addr_msb)
-        .write(sp, value_lsb)
-        .write(sp + 1, value_msb)
-        .build();
-    let mut cpu = CPU::builder().sp(sp).build();
-    let m = cpu.step(&mut mmu);
-
-    assert_eq!(m, 5);
-    assert_eq!(cpu.get_pc(), 3);
-
-    let address = construct_u16(addr_lsb, addr_msb);
-    assert_eq!(mmu.read(address), value_lsb);
-    assert_eq!(mmu.read(address + 1), value_msb);
-}
-
-/// LOAD r16 imm16
-#[rstest]
-#[case::bc_load(0x01, 0x37, 0x13, 0x1337)]
-#[case::de_load(0x11, 0x37, 0x13, 0x1337)]
-#[case::hl_load(0x21, 0x37, 0x13, 0x1337)]
-#[case::sp_load(0x31, 0x37, 0x13, 0x1337)]
-fn test_ld_r16_imm16(
-    #[case] opcode: u8,
-    #[case] imm1: u8,
-    #[case] imm2: u8,
-    #[case] expected_value: u16,
-) {
-    let mut mmu = MMU::builder()
-        .rom(0, opcode)
-        .rom(1, imm1)
-        .rom(2, imm2)
-        .build();
-    let mut cpu = CPU::default();
-    let m = cpu.step(&mut mmu);
-
-    match opcode {
-        0x01 => assert_eq!(cpu.get_bc(), expected_value),
-        0x11 => assert_eq!(cpu.get_de(), expected_value),
-        0x21 => assert_eq!(cpu.get_hl(), expected_value),
-        0x31 => assert_eq!(cpu.get_sp(), expected_value),
-        _ => panic!("unexpected opcode"),
-    }
-
-    assert_eq!(cpu.get_pc(), 3);
-    assert_eq!(m, 3);
-}
-
 /// ADD register (B, C, D, E, H, L)
 #[rstest]
 // Tests for ADD B (0x80)
@@ -317,6 +184,297 @@ fn test_add_a(
     assert_eq!(cpu.get_registers().get_f_carry(), expected_c);
     assert_eq!(cpu.get_pc(), 1);
     assert_eq!(m, 2);
+}
+
+/// DEC r8 (except HL)
+#[rstest]
+#[case::decrement_b(0x05, 23)]
+#[case::decrement_c(0x0D, 23)]
+#[case::decrement_d(0x15, 23)]
+#[case::decrement_e(0x1D, 23)]
+#[case::decrement_h(0x25, 23)]
+#[case::decrement_l(0x2D, 23)]
+#[case::decrement_a(0x3D, 23)]
+fn test_dec_r8(#[case] opcode: u8, #[case] value: u8) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .b(if opcode == 0x05 { value } else { 0 })
+        .c(if opcode == 0x0D { value } else { 0 })
+        .d(if opcode == 0x15 { value } else { 0 })
+        .e(if opcode == 0x1D { value } else { 0 })
+        .h(if opcode == 0x25 { value } else { 0 })
+        .l(if opcode == 0x2D { value } else { 0 })
+        .a(if opcode == 0x3D { value } else { 0 })
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+
+    match opcode {
+        0x05 => assert_eq!(cpu.get_b(), value - 1),
+        0x0D => assert_eq!(cpu.get_c(), value - 1),
+        0x15 => assert_eq!(cpu.get_d(), value - 1),
+        0x1D => assert_eq!(cpu.get_e(), value - 1),
+        0x25 => assert_eq!(cpu.get_h(), value - 1),
+        0x2D => assert_eq!(cpu.get_l(), value - 1),
+        0x3D => assert_eq!(cpu.get_a(), value - 1),
+        _ => panic!("Unexpected opcode"),
+    }
+}
+
+/// DEC HL (0x35)
+#[test]
+fn test_dec_hl() {
+    const ADDRESS: u16 = 0xC000;
+    const VALUE: u8 = 23;
+
+    let mut mmu = MMU::builder().rom(0, 0x35).write(ADDRESS, VALUE).build();
+    let mut cpu = CPU::builder().hl(ADDRESS).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 3);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(mmu.read(ADDRESS), VALUE - 1);
+}
+
+/// DEC r16
+#[rstest]
+#[case::decrement_bc(0x0B, 23)]
+#[case::decrement_de(0x1B, 23)]
+#[case::decrement_hl(0x2B, 23)]
+#[case::decrement_sp(0x3B, 23)]
+fn test_dec_r16(#[case] opcode: u8, #[case] value: u16) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .bc(if opcode == 0x0B { value } else { 0 })
+        .de(if opcode == 0x1B { value } else { 0 })
+        .hl(if opcode == 0x2B { value } else { 0 })
+        .sp(if opcode == 0x3B { value } else { 0 })
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    match opcode {
+        0x0B => assert_eq!(cpu.get_bc(), value - 1),
+        0x1B => assert_eq!(cpu.get_de(), value - 1),
+        0x2B => assert_eq!(cpu.get_hl(), value - 1),
+        0x3B => assert_eq!(cpu.get_sp(), value - 1),
+        _ => panic!("Unexpected opcode"),
+    }
+}
+
+/// INC r8 (except HL)
+#[rstest]
+#[case::increment_b(0x04, 23)]
+#[case::increment_c(0x0C, 23)]
+#[case::increment_d(0x14, 23)]
+#[case::increment_e(0x1C, 23)]
+#[case::increment_h(0x24, 23)]
+#[case::increment_l(0x2C, 23)]
+#[case::increment_a(0x3C, 23)]
+fn test_inc_r8(#[case] opcode: u8, #[case] value: u8) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .b(if opcode == 0x04 { value } else { 0 })
+        .c(if opcode == 0x0C { value } else { 0 })
+        .d(if opcode == 0x14 { value } else { 0 })
+        .e(if opcode == 0x1C { value } else { 0 })
+        .h(if opcode == 0x24 { value } else { 0 })
+        .l(if opcode == 0x2C { value } else { 0 })
+        .a(if opcode == 0x3C { value } else { 0 })
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+
+    match opcode {
+        0x04 => assert_eq!(cpu.get_b(), value + 1),
+        0x0C => assert_eq!(cpu.get_c(), value + 1),
+        0x14 => assert_eq!(cpu.get_d(), value + 1),
+        0x1C => assert_eq!(cpu.get_e(), value + 1),
+        0x24 => assert_eq!(cpu.get_h(), value + 1),
+        0x2C => assert_eq!(cpu.get_l(), value + 1),
+        0x3C => assert_eq!(cpu.get_a(), value + 1),
+        _ => panic!("Unexpected opcode"),
+    }
+}
+
+/// INC HL (0x34)
+#[test]
+fn test_inc_hl() {
+    const ADDRESS: u16 = 0xC000;
+    const VALUE: u8 = 23;
+
+    let mut mmu = MMU::builder().rom(0, 0x34).write(ADDRESS, VALUE).build();
+    let mut cpu = CPU::builder().hl(ADDRESS).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 3);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(mmu.read(ADDRESS), VALUE + 1);
+}
+
+/// INC r16
+#[rstest]
+#[case::decrement_bc(0x03, 23)]
+#[case::decrement_de(0x13, 23)]
+#[case::decrement_hl(0x23, 23)]
+#[case::decrement_sp(0x33, 23)]
+fn test_inc_r16(#[case] opcode: u8, #[case] value: u16) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .bc(if opcode == 0x03 { value } else { 0 })
+        .de(if opcode == 0x13 { value } else { 0 })
+        .hl(if opcode == 0x23 { value } else { 0 })
+        .sp(if opcode == 0x33 { value } else { 0 })
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    match opcode {
+        0x03 => assert_eq!(cpu.get_bc(), value + 1),
+        0x13 => assert_eq!(cpu.get_de(), value + 1),
+        0x23 => assert_eq!(cpu.get_hl(), value + 1),
+        0x33 => assert_eq!(cpu.get_sp(), value + 1),
+        _ => panic!("Unexpected opcode"),
+    }
+}
+
+/// NOP (0x00)
+#[test]
+fn test_nop() {
+    let mut mmu = MMU::builder().rom(0, 0x00).build();
+    let mut cpu = CPU::default();
+
+    let m = cpu.step(&mut mmu);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(m, 1);
+}
+
+/// Load A r16
+#[rstest]
+#[case::bc_load(0x0A, 0xC337, 0x5A)]
+#[case::de_load(0x1A, 0xC337, 0x5A)]
+#[case::hli_load(0x2A, 0xC337, 0x5A)]
+#[case::hld_load(0x3A, 0xC337, 0x5A)]
+fn test_ld_a_r16(#[case] opcode: u8, #[case] address: u16, #[case] value: u8) {
+    let mut mmu = MMU::builder().rom(0, opcode).write(address, value).build();
+    let mut cpu = CPU::builder()
+        .a(value)
+        .bc(if opcode == 0x0A { address } else { 0 })
+        .de(if opcode == 0x1A { address } else { 0 })
+        .hl(if opcode == 0x2A || opcode == 0x3A {
+            address
+        } else {
+            0
+        })
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), value);
+
+    if opcode == 0x2A {
+        assert_eq!(cpu.get_hl(), address + 1);
+    } else if opcode == 0x3A {
+        assert_eq!(cpu.get_hl(), address - 1);
+    }
+}
+
+/// Load r16 A
+#[rstest]
+#[case::bc_load(0x02, 0xC337, 0x5A)]
+#[case::de_load(0x12, 0xC337, 0x5A)]
+#[case::hli_load(0x22, 0xC337, 0x5A)]
+#[case::hld_load(0x32, 0xC337, 0x5A)]
+fn test_ld_r16_a(#[case] opcode: u8, #[case] address: u16, #[case] value: u8) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .a(value)
+        .bc(if opcode == 0x02 { address } else { 0 })
+        .de(if opcode == 0x12 { address } else { 0 })
+        .hl(if opcode == 0x22 || opcode == 0x32 {
+            address
+        } else {
+            0
+        })
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(mmu.read(address), value);
+
+    if opcode == 0x22 {
+        assert_eq!(cpu.get_hl(), address + 1);
+    } else if opcode == 0x32 {
+        assert_eq!(cpu.get_hl(), address - 1);
+    }
+}
+
+/// LOAD imm16 SP (0x08)
+#[rstest]
+#[case::basic_load(0xFFFE, 0x37, 0x13, 0x00, 0xC0)]
+fn test_ld_imm16_sp(
+    #[case] sp: u16,
+    #[case] value_lsb: u8,
+    #[case] value_msb: u8,
+    #[case] addr_lsb: u8,
+    #[case] addr_msb: u8,
+) {
+    let mut mmu = MMU::builder()
+        .rom(0, 0x08)
+        .rom(1, addr_lsb)
+        .rom(2, addr_msb)
+        .write(sp, value_lsb)
+        .write(sp + 1, value_msb)
+        .build();
+    let mut cpu = CPU::builder().sp(sp).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 5);
+    assert_eq!(cpu.get_pc(), 3);
+
+    let address = construct_u16(addr_lsb, addr_msb);
+    assert_eq!(mmu.read(address), value_lsb);
+    assert_eq!(mmu.read(address + 1), value_msb);
+}
+
+/// LOAD r16 imm16
+#[rstest]
+#[case::bc_load(0x01, 0x37, 0x13, 0x1337)]
+#[case::de_load(0x11, 0x37, 0x13, 0x1337)]
+#[case::hl_load(0x21, 0x37, 0x13, 0x1337)]
+#[case::sp_load(0x31, 0x37, 0x13, 0x1337)]
+fn test_ld_r16_imm16(
+    #[case] opcode: u8,
+    #[case] imm1: u8,
+    #[case] imm2: u8,
+    #[case] expected_value: u16,
+) {
+    let mut mmu = MMU::builder()
+        .rom(0, opcode)
+        .rom(1, imm1)
+        .rom(2, imm2)
+        .build();
+    let mut cpu = CPU::default();
+    let m = cpu.step(&mut mmu);
+
+    match opcode {
+        0x01 => assert_eq!(cpu.get_bc(), expected_value),
+        0x11 => assert_eq!(cpu.get_de(), expected_value),
+        0x21 => assert_eq!(cpu.get_hl(), expected_value),
+        0x31 => assert_eq!(cpu.get_sp(), expected_value),
+        _ => panic!("unexpected opcode"),
+    }
+
+    assert_eq!(cpu.get_pc(), 3);
+    assert_eq!(m, 3);
 }
 
 /// JUMP imm16 (0xC3)

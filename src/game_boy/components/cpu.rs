@@ -1,5 +1,5 @@
-use crate::enums::parameter_groups::{JumpCondition, R16Mem, R16};
-use crate::enums::parameter_groups::{R16Stack, R8};
+use crate::enums::parameter_groups::R16Stack;
+use crate::enums::parameter_groups::{JumpCondition, R16Mem, R16, R8};
 use crate::game_boy::components::cpu::builder::CpuBuilder;
 use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
 use crate::game_boy::components::mmu::MMU;
@@ -37,6 +37,10 @@ impl CPU {
     pub fn execute(&mut self, instruction: Instruction, mmu: &mut MMU) -> (u16, u8) {
         match instruction {
             Instruction::Add(r8) => self.add(r8, mmu),
+            Instruction::DecR8(r8) => self.decrement_r8(r8, mmu),
+            Instruction::DecR16(r16) => self.decrement_r16(r16),
+            Instruction::IncR8(r8) => self.increment_r8(r8, mmu),
+            Instruction::IncR16(r16) => self.increment_r16(r16),
             Instruction::JpHL => self.jump_hl(),
             Instruction::JpImm16 => self.jump_imm(mmu),
             Instruction::JpCondImm16(condition) => self.jump_condition_imm(condition, mmu),
@@ -71,6 +75,45 @@ impl CPU {
 
 /// Direct instruction interfaces
 impl CPU {
+    pub fn add(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.get_r8(r8, mmu);
+        let (new_value, did_overflow) = self.get_a().overflowing_add(source_value);
+
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_carry(did_overflow);
+
+        let half_carry = (self.get_a() & 0xF) + (source_value & 0xF) > 0xF;
+        self.set_f_half_carry(half_carry);
+
+        self.set_a(new_value);
+
+        let m = if r8 == R8::HL { 3 } else { 2 };
+        self.instruction_result(1, m)
+    }
+
+    pub fn decrement_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
+        self.set_r8(r8, self.get_r8(r8, mmu).wrapping_sub(1), mmu);
+        let m = if r8 == R8::HL { 3 } else { 1 };
+        self.instruction_result(1, m)
+    }
+
+    pub fn decrement_r16(&mut self, r16: R16) -> (u16, u8) {
+        self.set_r16(r16, self.get_r16(r16).wrapping_sub(1));
+        self.instruction_result(1, 2)
+    }
+
+    pub fn increment_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
+        self.set_r8(r8, self.get_r8(r8, mmu).wrapping_add(1), mmu);
+        let m = if r8 == R8::HL { 3 } else { 1 };
+        self.instruction_result(1, m)
+    }
+
+    pub fn increment_r16(&mut self, r16: R16) -> (u16, u8) {
+        self.set_r16(r16, self.get_r16(r16).wrapping_add(1));
+        self.instruction_result(1, 2)
+    }
+
     pub fn load_r16_imm(&mut self, r16: R16, mmu: &MMU) -> (u16, u8) {
         let value = self.read_next_imm16(mmu);
         self.set_r16(r16, value);
@@ -103,23 +146,6 @@ impl CPU {
         mmu.write(address.wrapping_add(1), value_msb);
 
         self.instruction_result(3, 5)
-    }
-
-    pub fn add(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
-        let source_value = self.get_r8(r8, mmu);
-        let (new_value, did_overflow) = self.get_a().overflowing_add(source_value);
-
-        self.set_f_zero(new_value == 0);
-        self.set_f_subtract(false);
-        self.set_f_carry(did_overflow);
-
-        let half_carry = (self.get_a() & 0xF) + (source_value & 0xF) > 0xF;
-        self.set_f_half_carry(half_carry);
-
-        self.set_a(new_value);
-
-        let m = if r8 == R8::HL { 3 } else { 2 };
-        self.instruction_result(1, m)
     }
 
     pub fn pop_r16(&mut self, r16_stack: R16Stack, mmu: &MMU) -> (u16, u8) {
@@ -177,6 +203,10 @@ impl CPU {
 impl CPU {
     fn instruction_result(&self, pc_raise: u16, m_cycles: u8) -> (u16, u8) {
         (self.get_pc().wrapping_add(pc_raise), m_cycles)
+    }
+
+    fn read_next_imm8(&self, mmu: &MMU) -> u8 {
+        mmu.read(self.get_pc().wrapping_add(1))
     }
 
     fn read_next_imm16(&self, mmu: &MMU) -> u16 {
