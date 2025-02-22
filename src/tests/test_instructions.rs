@@ -628,6 +628,45 @@ fn test_jump_hl(#[case] target_address: u16) {
     assert_eq!(m, 1);
 }
 
+/// JR imm8 (0x18)
+#[test]
+fn test_jr_imm8() {
+    const RELATIVE_JUMP: u8 = 28;
+
+    let mut mmu = MMU::builder().rom(0, 0x18).rom(1, RELATIVE_JUMP).build();
+    let mut cpu = CPU::default();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 3);
+    assert_eq!(cpu.get_pc(), RELATIVE_JUMP as u16 + 2);
+}
+
+/// JR cond imm8
+#[rstest]
+#[case::nz_jump(0x20, 30, 32, 3, false, false)]
+#[case::nz_no_jump(0x20, 30, 2, 2, true, false)]
+#[case::z_jump(0x28, 30, 32, 3, true, false)]
+#[case::z_no_jump(0x28, 30, 2, 2, false, false)]
+#[case::nc_jump(0x30, 30, 32, 3, false, false)]
+#[case::nc_no_jump(0x30, 30, 2, 2, false, true)]
+#[case::c_jump(0x38, 30, 32, 3, false, true)]
+#[case::c_no_jump(0x38, 30, 2, 2, false, false)]
+fn test_jr_cond_imm8(
+    #[case] opcode: u8,
+    #[case] immediate: u8,
+    #[case] target_pc: u16,
+    #[case] target_m: u8,
+    #[case] zero_flag: bool,
+    #[case] carry_flag: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, opcode).rom(1, immediate).build();
+    let mut cpu = CPU::builder().f_zero(zero_flag).f_carry(carry_flag).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, target_m);
+    assert_eq!(cpu.get_pc(), target_pc);
+}
+
 /// PUSH r16
 #[rstest]
 #[case::bc_push_basic(0xC5, 0xFFFE, 0x1337, 0x1337)]

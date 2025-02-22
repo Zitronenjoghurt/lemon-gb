@@ -43,8 +43,10 @@ impl CPU {
             Instruction::IncR8(r8) => self.increment_r8(r8, mmu),
             Instruction::IncR16(r16) => self.increment_r16(r16),
             Instruction::JpHL => self.jump_hl(),
-            Instruction::JpImm16 => self.jump_imm(mmu),
-            Instruction::JpCondImm16(condition) => self.jump_condition_imm(condition, mmu),
+            Instruction::JpImm16 => self.jump_imm16(mmu),
+            Instruction::JpCondImm16(condition) => self.jump_condition_imm16(condition, mmu),
+            Instruction::JrImm8 => self.jump_relative_imm8(mmu),
+            Instruction::JrCondImm8(cond) => self.jump_relative_condition_imm8(cond, mmu),
             Instruction::LoadAR16(r16_mem) => self.load_a_r16m(r16_mem, mmu),
             Instruction::LoadR16A(r16_mem) => self.load_r16m_a(r16_mem, mmu),
             Instruction::LoadR16Imm16(r16) => self.load_r16_imm(r16, mmu),
@@ -188,18 +190,33 @@ impl CPU {
         (new_pc, 1)
     }
 
-    pub fn jump_imm(&self, mmu: &MMU) -> (u16, u8) {
+    pub fn jump_imm16(&self, mmu: &MMU) -> (u16, u8) {
         let new_pc = self.read_next_imm16(mmu);
         (new_pc, 4)
     }
 
-    pub fn jump_condition_imm(&self, condition: JumpCondition, mmu: &MMU) -> (u16, u8) {
+    pub fn jump_condition_imm16(&self, condition: JumpCondition, mmu: &MMU) -> (u16, u8) {
         let should_jump = self.check_jump_condition(condition);
 
         if should_jump {
-            self.jump_imm(mmu)
+            self.jump_imm16(mmu)
         } else {
             self.instruction_result(3, 3)
+        }
+    }
+
+    pub fn jump_relative_imm8(&self, mmu: &MMU) -> (u16, u8) {
+        let value = self.read_next_imm8(mmu) as u16;
+        self.instruction_result(value + 2, 3)
+    }
+
+    pub fn jump_relative_condition_imm8(&self, condition: JumpCondition, mmu: &MMU) -> (u16, u8) {
+        let should_jump = self.check_jump_condition(condition);
+
+        if should_jump {
+            self.jump_relative_imm8(mmu)
+        } else {
+            self.instruction_result(2, 2)
         }
     }
 }

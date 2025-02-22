@@ -4,6 +4,7 @@ use std::error::Error;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Instruction {
+    /// Add value from the specified register to the HL register
     AddHLR16(R16),
     /// Add the specified register to register A
     AddR8(R8),
@@ -21,6 +22,10 @@ pub enum Instruction {
     JpImm16,
     /// Conditional jump to the address specified in the following 2 bytes
     JpCondImm16(JumpCondition),
+    /// Unconditional relative jump incrementing the program counter by the specified byte
+    JrImm8,
+    /// Conditional relative jump incrementing the program counter by the specified byte
+    JrCondImm8(JumpCondition),
     /// Loads the value from the address stored in the provided register into register A
     /// For HL-, HL is decremented after the operation
     /// For HL+, HL is incremented after the operation
@@ -75,19 +80,23 @@ impl Instruction {
             0b0001_0100 => Ok(Instruction::IncR8(R8::D)),          // 0x14
             0b0001_0101 => Ok(Instruction::DecR8(R8::D)),          // 0x15
             0b0001_0110 => Ok(Instruction::LoadR8Imm8(R8::D)),     // 0x16
+            0b0001_1000 => Ok(Instruction::JrImm8),                // 0x18
             0b0001_1001 => Ok(Instruction::AddHLR16(R16::DE)),     // 0x19
             0b0001_1010 => Ok(Instruction::LoadAR16(R16Mem::DE)),  // 0x1A
             0b0001_1011 => Ok(Instruction::DecR16(R16::DE)),       // 0x1B
             0b0001_1100 => Ok(Instruction::IncR8(R8::E)),          // 0x1C
             0b0001_1101 => Ok(Instruction::DecR8(R8::E)),          // 0x1D
             0b0001_1110 => Ok(Instruction::LoadR8Imm8(R8::E)),     // 0x1E
+            0b0010_0000 => Ok(Instruction::JrCondImm8(JumpCondition::NotZero)), // 0x20
             0b0010_0001 => Ok(Instruction::LoadR16Imm16(R16::HL)), // 0x21
             0b0010_0010 => Ok(Instruction::LoadR16A(R16Mem::HLI)), // 0x22
             0b0010_0011 => Ok(Instruction::IncR16(R16::HL)),       // 0x23
             0b0010_0100 => Ok(Instruction::IncR8(R8::H)),          // 0x24
             0b0010_0101 => Ok(Instruction::DecR8(R8::H)),          // 0x25
             0b0010_0110 => Ok(Instruction::LoadR8Imm8(R8::H)),     // 0x26
+            0b0010_1000 => Ok(Instruction::JrCondImm8(JumpCondition::Zero)), // 0x28
             0b0010_1001 => Ok(Instruction::AddHLR16(R16::HL)),     // 0x29
+            0b0011_0000 => Ok(Instruction::JrCondImm8(JumpCondition::NotCarry)), // 0x30
             0b0010_1010 => Ok(Instruction::LoadAR16(R16Mem::HLI)), // 0x2A
             0b0010_1011 => Ok(Instruction::DecR16(R16::HL)),       // 0x2B
             0b0010_1100 => Ok(Instruction::IncR8(R8::L)),          // 0x2C
@@ -99,6 +108,7 @@ impl Instruction {
             0b0011_0100 => Ok(Instruction::IncR8(R8::HL)),         // 0x34
             0b0011_0101 => Ok(Instruction::DecR8(R8::HL)),         // 0x35
             0b0011_0110 => Ok(Instruction::LoadR8Imm8(R8::HL)),    // 0x36
+            0b0011_1000 => Ok(Instruction::JrCondImm8(JumpCondition::Carry)), // 0x38
             0b0011_1001 => Ok(Instruction::AddHLR16(R16::SP)),     // 0x39
             0b0011_1010 => Ok(Instruction::LoadAR16(R16Mem::HLD)), // 0x3A
             0b0011_1011 => Ok(Instruction::DecR16(R16::SP)),       // 0x3B
@@ -151,7 +161,7 @@ impl Instruction {
             | Self::IncR8(_)
             | Self::DecR8(_)
             | Self::AddHLR16(_) => 1,
-            Self::LoadR8Imm8(_) => 2,
+            Self::LoadR8Imm8(_) | Self::JrImm8 | Self::JrCondImm8(_) => 2,
             Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
     }
@@ -205,6 +215,8 @@ impl Instruction {
             Self::JpHL => "JP HL".into(),
             Self::JpImm16 => format!("JP 0x{:02X}{:02X}", msb, lsb),
             Self::JpCondImm16(cond) => format!("JP {cond}, 0x{:02X}{:02X}", msb, lsb),
+            Self::JrImm8 => format!("JR 0x{:02X}", lsb),
+            Self::JrCondImm8(cond) => format!("JR {cond}, 0x{:02X}", lsb),
             Self::LoadAR16(r16_mem) => format!("LD A, {r16_mem}"),
             Self::LoadR16A(r16_mem) => format!("LD {r16_mem}, A"),
             Self::LoadR16Imm16(r16) => format!("LD {r16}, 0x{:02X}{:02X}", msb, lsb),
@@ -233,6 +245,17 @@ impl Instruction {
                     cond.description(),
                     msb,
                     lsb
+                )
+            }
+            Self::JrImm8 => format!(
+                "Jump relative, incrementing the program counter by 0x{:02X}",
+                lsb
+            ),
+            Self::JrCondImm8(cond) => {
+                format!(
+                    "If {}, jump relative, incrementing the program counter by 0x{:02X}",
+                    cond.description(),
+                    lsb,
                 )
             }
             Self::LoadAR16(r16_mem) => {
