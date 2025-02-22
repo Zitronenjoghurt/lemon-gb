@@ -186,6 +186,52 @@ fn test_add_a(
     assert_eq!(m, 2);
 }
 
+/// ADD HL r16
+#[rstest]
+#[case::bc_no_carry(0x09, 0x1234, 0x2345, 0x3579, false, false)]
+#[case::bc_half_carry(0x09, 0x0800, 0x0800, 0x1000, true, false)]
+#[case::bc_carry(0x09, 0x8000, 0x8000, 0x0000, false, true)]
+#[case::bc_both_carries(0x09, 0xFFFF, 0x0001, 0x0000, true, true)]
+#[case::de_no_carry(0x19, 0x1234, 0x2345, 0x3579, false, false)]
+#[case::de_half_carry(0x19, 0x0800, 0x0800, 0x1000, true, false)]
+#[case::de_carry(0x19, 0x8000, 0x8000, 0x0000, false, true)]
+#[case::de_both_carries(0x19, 0xFFFF, 0x0001, 0x0000, true, true)]
+#[case::hl_no_carry(0x29, 0x2222, 0x2222, 0x4444, false, false)]
+#[case::hl_half_carry(0x29, 0x0800, 0x0800, 0x1000, true, false)]
+#[case::hl_carry(0x29, 0x8000, 0x8000, 0x0000, false, true)]
+#[case::hl_both_carries(0x39, 0x8800, 0x8800, 0x1000, true, true)]
+#[case::sp_no_carry(0x39, 0x1234, 0x2345, 0x3579, false, false)]
+#[case::sp_half_carry(0x39, 0x0800, 0x0800, 0x1000, true, false)]
+#[case::sp_carry(0x39, 0x8000, 0x8000, 0x0000, false, true)]
+#[case::sp_both_carries(0x39, 0xFFFF, 0x0001, 0x0000, true, true)]
+fn test_add_hl_r16(
+    #[case] opcode: u8,
+    #[case] value_hl: u16,
+    #[case] value_r16: u16,
+    #[case] expected_hl: u16,
+    #[case] expected_half_carry: bool,
+    #[case] expected_carry: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .bc(if opcode == 0x09 { value_r16 } else { 0 })
+        .de(if opcode == 0x19 { value_r16 } else { 0 })
+        .hl(value_hl)
+        .sp(if opcode == 0x39 { value_r16 } else { 0 })
+        .f_subtract(true)
+        .f_zero(true)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_hl(), expected_hl);
+    assert_eq!(cpu.get_f_half_carry(), expected_half_carry);
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert!(!cpu.get_f_subtract());
+    assert!(cpu.get_f_zero());
+}
+
 /// DEC r8 (except HL)
 #[rstest]
 #[case::decrement_b(0x05, 23)]

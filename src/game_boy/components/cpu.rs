@@ -3,7 +3,7 @@ use crate::enums::parameter_groups::{JumpCondition, R16Mem, R16, R8};
 use crate::game_boy::components::cpu::builder::CpuBuilder;
 use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
 use crate::game_boy::components::mmu::MMU;
-use crate::helpers::bit_operations::{construct_u16, deconstruct_u16};
+use crate::helpers::bit_operations::{add_carry_u16, add_carry_u8, construct_u16, deconstruct_u16};
 use crate::instructions::Instruction;
 use registers::CPURegisters;
 
@@ -36,7 +36,8 @@ impl CPU {
     /// Returns (New PC, M Cycles taken)
     pub fn execute(&mut self, instruction: Instruction, mmu: &mut MMU) -> (u16, u8) {
         match instruction {
-            Instruction::Add(r8) => self.add(r8, mmu),
+            Instruction::AddHLR16(r16) => self.add_hl_r16(r16),
+            Instruction::AddR8(r8) => self.add_r8(r8, mmu),
             Instruction::DecR8(r8) => self.decrement_r8(r8, mmu),
             Instruction::DecR16(r16) => self.decrement_r16(r16),
             Instruction::IncR8(r8) => self.increment_r8(r8, mmu),
@@ -76,21 +77,30 @@ impl CPU {
 
 /// Direct instruction interfaces
 impl CPU {
-    pub fn add(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
+    pub fn add_r8(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
         let source_value = self.get_r8(r8, mmu);
-        let (new_value, did_overflow) = self.get_a().overflowing_add(source_value);
-
-        self.set_f_zero(new_value == 0);
-        self.set_f_subtract(false);
-        self.set_f_carry(did_overflow);
-
-        let half_carry = (self.get_a() & 0xF) + (source_value & 0xF) > 0xF;
-        self.set_f_half_carry(half_carry);
+        let (new_value, half_carry, carry) = add_carry_u8(self.get_a(), source_value);
 
         self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
 
         let m = if r8 == R8::HL { 3 } else { 2 };
         self.instruction_result(1, m)
+    }
+
+    pub fn add_hl_r16(&mut self, r16: R16) -> (u16, u8) {
+        let source_value = self.get_r16(r16);
+        let (new_value, half_carry, carry) = add_carry_u16(self.get_hl(), source_value);
+
+        self.set_hl(new_value);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        self.instruction_result(1, 2)
     }
 
     pub fn decrement_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {

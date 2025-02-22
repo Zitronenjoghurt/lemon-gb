@@ -4,8 +4,9 @@ use std::error::Error;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Instruction {
+    AddHLR16(R16),
     /// Add the specified register to register A
-    Add(R8),
+    AddR8(R8),
     /// Decrement the specified register
     DecR8(R8),
     /// Decrement the specified register
@@ -62,6 +63,7 @@ impl Instruction {
             0b0000_0101 => Ok(Instruction::DecR8(R8::B)),          // 0x05
             0b0000_0110 => Ok(Instruction::LoadR8Imm8(R8::B)),     // 0x06
             0b0000_1000 => Ok(Instruction::LoadImm16SP),           // 0x08
+            0b0000_1001 => Ok(Instruction::AddHLR16(R16::BC)),     // 0x09
             0b0000_1010 => Ok(Instruction::LoadAR16(R16Mem::BC)),  // 0x0A
             0b0000_1011 => Ok(Instruction::DecR16(R16::BC)),       // 0x0B
             0b0000_1100 => Ok(Instruction::IncR8(R8::C)),          // 0x0C
@@ -73,6 +75,7 @@ impl Instruction {
             0b0001_0100 => Ok(Instruction::IncR8(R8::D)),          // 0x14
             0b0001_0101 => Ok(Instruction::DecR8(R8::D)),          // 0x15
             0b0001_0110 => Ok(Instruction::LoadR8Imm8(R8::D)),     // 0x16
+            0b0001_1001 => Ok(Instruction::AddHLR16(R16::DE)),     // 0x19
             0b0001_1010 => Ok(Instruction::LoadAR16(R16Mem::DE)),  // 0x1A
             0b0001_1011 => Ok(Instruction::DecR16(R16::DE)),       // 0x1B
             0b0001_1100 => Ok(Instruction::IncR8(R8::E)),          // 0x1C
@@ -84,6 +87,7 @@ impl Instruction {
             0b0010_0100 => Ok(Instruction::IncR8(R8::H)),          // 0x24
             0b0010_0101 => Ok(Instruction::DecR8(R8::H)),          // 0x25
             0b0010_0110 => Ok(Instruction::LoadR8Imm8(R8::H)),     // 0x26
+            0b0010_1001 => Ok(Instruction::AddHLR16(R16::HL)),     // 0x29
             0b0010_1010 => Ok(Instruction::LoadAR16(R16Mem::HLI)), // 0x2A
             0b0010_1011 => Ok(Instruction::DecR16(R16::HL)),       // 0x2B
             0b0010_1100 => Ok(Instruction::IncR8(R8::L)),          // 0x2C
@@ -95,19 +99,20 @@ impl Instruction {
             0b0011_0100 => Ok(Instruction::IncR8(R8::HL)),         // 0x34
             0b0011_0101 => Ok(Instruction::DecR8(R8::HL)),         // 0x35
             0b0011_0110 => Ok(Instruction::LoadR8Imm8(R8::HL)),    // 0x36
+            0b0011_1001 => Ok(Instruction::AddHLR16(R16::SP)),     // 0x39
             0b0011_1010 => Ok(Instruction::LoadAR16(R16Mem::HLD)), // 0x3A
             0b0011_1011 => Ok(Instruction::DecR16(R16::SP)),       // 0x3B
             0b0011_1100 => Ok(Instruction::IncR8(R8::A)),          // 0x3C
             0b0011_1101 => Ok(Instruction::DecR8(R8::A)),          // 0x3D
             0b0011_1110 => Ok(Instruction::LoadR8Imm8(R8::A)),     // 0x3E
-            0b1000_0000 => Ok(Instruction::Add(R8::B)),            // 0x80
-            0b1000_0001 => Ok(Instruction::Add(R8::C)),            // 0x81
-            0b1000_0010 => Ok(Instruction::Add(R8::D)),            // 0x82
-            0b1000_0011 => Ok(Instruction::Add(R8::E)),            // 0x83
-            0b1000_0100 => Ok(Instruction::Add(R8::H)),            // 0x84
-            0b1000_0101 => Ok(Instruction::Add(R8::L)),            // 0x85
-            0b1000_0110 => Ok(Instruction::Add(R8::HL)),           // 0x86
-            0b1000_0111 => Ok(Instruction::Add(R8::A)),            // 0x87
+            0b1000_0000 => Ok(Instruction::AddR8(R8::B)),          // 0x80
+            0b1000_0001 => Ok(Instruction::AddR8(R8::C)),          // 0x81
+            0b1000_0010 => Ok(Instruction::AddR8(R8::D)),          // 0x82
+            0b1000_0011 => Ok(Instruction::AddR8(R8::E)),          // 0x83
+            0b1000_0100 => Ok(Instruction::AddR8(R8::H)),          // 0x84
+            0b1000_0101 => Ok(Instruction::AddR8(R8::L)),          // 0x85
+            0b1000_0110 => Ok(Instruction::AddR8(R8::HL)),         // 0x86
+            0b1000_0111 => Ok(Instruction::AddR8(R8::A)),          // 0x87
             0b1100_0001 => Ok(Instruction::PopR16(R16Stack::BC)),  // 0xC1
             0b1100_0010 => Ok(Instruction::JpCondImm16(JumpCondition::NotZero)), // 0xC2
             0b1100_0011 => Ok(Instruction::JpImm16),               // 0xC3
@@ -135,7 +140,7 @@ impl Instruction {
     pub fn get_length(&self) -> usize {
         match self {
             Self::Nop
-            | Self::Add(_)
+            | Self::AddR8(_)
             | Self::JpHL
             | Self::PopR16(_)
             | Self::PushR16(_)
@@ -144,7 +149,8 @@ impl Instruction {
             | Self::IncR16(_)
             | Self::DecR16(_)
             | Self::IncR8(_)
-            | Self::DecR8(_) => 1,
+            | Self::DecR8(_)
+            | Self::AddHLR16(_) => 1,
             Self::LoadR8Imm8(_) => 2,
             Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
@@ -190,7 +196,8 @@ impl Instruction {
     pub fn parse_clear_text(&self, lsb: u8, msb: u8) -> String {
         match self {
             Self::Nop => "NOP".into(),
-            Self::Add(r8) => format!("ADD A, {r8}"),
+            Self::AddHLR16(r16) => format!("ADD HL, {r16}"),
+            Self::AddR8(r8) => format!("ADD A, {r8}"),
             Self::DecR8(r8) => format!("DEC {r8}"),
             Self::DecR16(r16) => format!("DEC {r16}"),
             Self::IncR8(r8) => format!("INC {r8}"),
@@ -212,7 +219,8 @@ impl Instruction {
     pub fn parse_description(&self, lsb: u8, msb: u8) -> String {
         match self {
             Self::Nop => "No Operation".into(),
-            Self::Add(r8) => format!("Add value from register {r8} to register A"),
+            Self::AddHLR16(r16) => format!("Add value from register {r16} to register HL"),
+            Self::AddR8(r8) => format!("Add value from register {r8} to register A"),
             Self::DecR8(r8) => format!("Decrement register {r8}"),
             Self::DecR16(r16) => format!("Decrement register {r16}"),
             Self::IncR8(r8) => format!("Increment register {r8}"),

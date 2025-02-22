@@ -33,3 +33,23 @@ pub fn get_bit_u8(value: u8, bit_index: usize) -> bool {
 pub fn get_bit_u16(value: u16, bit_index: usize) -> bool {
     (value >> bit_index) & 1 == 1
 }
+
+/// Adds a and b and returns (result, half_carry, carry)
+pub fn add_carry_u8(a: u8, b: u8) -> (u8, bool, bool) {
+    let (result, carry) = a.overflowing_add(b);
+
+    // Check half carry (bit 3)
+    let h_carry = ((a & 0x0F) + (b & 0x0F)) > 0x0F;
+
+    (result, h_carry, carry)
+}
+
+/// Adds a and b and returns (result, half_carry, carry)
+pub fn add_carry_u16(a: u16, b: u16) -> (u16, bool, bool) {
+    let (result, carry) = a.overflowing_add(b);
+
+    // Check half carry (bit 11)
+    let h_carry = ((a & 0x0FFF) + (b & 0x0FFF)) > 0x0FFF;
+
+    (result, h_carry, carry)
+}
