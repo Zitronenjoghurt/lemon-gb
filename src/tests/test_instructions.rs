@@ -388,6 +388,36 @@ fn test_dec_r16(#[case] opcode: u8, #[case] value: u16) {
     }
 }
 
+/// DI (0xF3)
+#[test]
+fn test_di() {
+    let mut mmu = MMU::builder().rom(0, 0xF3).build();
+    let mut cpu = CPU::builder().ime(true).deferred_set_ime(true).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+    assert!(!cpu.get_ime());
+    assert!(!cpu.get_deferred_set_ime());
+}
+
+/// EI (0xFB)
+#[test]
+fn test_ei() {
+    let mut mmu = MMU::builder().rom(0, 0xFB).build();
+    let mut cpu = CPU::default();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+    assert!(!cpu.get_ime());
+    assert!(cpu.get_deferred_set_ime());
+
+    cpu.step(&mut mmu);
+    assert!(cpu.get_ime());
+    assert!(!cpu.get_deferred_set_ime());
+}
+
 /// INC r8 (except HL)
 #[rstest]
 #[case::increment_b(0x04, 23)]
@@ -806,6 +836,84 @@ fn test_pop_r16(
         0xF1 => assert_eq!(cpu.get_af(), expected_value),
         _ => panic!("Unexpected opcode"),
     }
+}
+
+/// RET (0xC9)
+#[test]
+fn test_ret() {
+    const SP: u16 = 0xFFFC;
+    const ADDR_LSB: u8 = 0x11;
+    const ADDR_MSB: u8 = 0xCC;
+
+    let mut mmu = MMU::builder()
+        .rom(0, 0xC9)
+        .write(SP, ADDR_LSB)
+        .write(SP + 1, ADDR_MSB)
+        .build();
+    let mut cpu = CPU::builder().sp(SP).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 4);
+    assert_eq!(cpu.get_sp(), SP + 2);
+    assert_eq!(cpu.get_pc(), construct_u16(ADDR_LSB, ADDR_MSB));
+}
+
+/// RET cond
+#[rstest]
+#[case::jump_nz(0xC0, 0xFFFC, 0x11, 0xCC, false, false, 5, 0xFFFE, 0xCC11)]
+#[case::no_jump_nz(0xC0, 0xFFFC, 0x11, 0xCC, true, false, 2, 0xFFFC, 1)]
+#[case::jump_z(0xC8, 0xFFFC, 0x11, 0xCC, true, false, 5, 0xFFFE, 0xCC11)]
+#[case::no_jump_z(0xC8, 0xFFFC, 0x11, 0xCC, false, false, 2, 0xFFFC, 1)]
+#[case::jump_nc(0xD0, 0xFFFC, 0x11, 0xCC, false, false, 5, 0xFFFE, 0xCC11)]
+#[case::no_jump_nc(0xD0, 0xFFFC, 0x11, 0xCC, false, true, 2, 0xFFFC, 1)]
+#[case::jump_c(0xD8, 0xFFFC, 0x11, 0xCC, false, true, 5, 0xFFFE, 0xCC11)]
+#[case::no_jump_c(0xD8, 0xFFFC, 0x11, 0xCC, false, false, 2, 0xFFFC, 1)]
+fn test_ret_cond(
+    #[case] opcode: u8,
+    #[case] sp: u16,
+    #[case] addr_lsb: u8,
+    #[case] addr_msb: u8,
+    #[case] zero_flag: bool,
+    #[case] carry_flag: bool,
+    #[case] expected_m: u8,
+    #[case] expected_sp: u16,
+    #[case] expected_pc: u16,
+) {
+    let mut mmu = MMU::builder()
+        .rom(0, opcode)
+        .write(sp, addr_lsb)
+        .write(sp + 1, addr_msb)
+        .build();
+    let mut cpu = CPU::builder()
+        .sp(sp)
+        .f_zero(zero_flag)
+        .f_carry(carry_flag)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, expected_m);
+    assert_eq!(cpu.get_sp(), expected_sp);
+    assert_eq!(cpu.get_pc(), expected_pc);
+}
+
+/// RETI (0xD9)
+#[test]
+fn test_reti() {
+    const SP: u16 = 0xFFFC;
+    const ADDR_LSB: u8 = 0x11;
+    const ADDR_MSB: u8 = 0xCC;
+    let mut mmu = MMU::builder()
+        .rom(0, 0xD9)
+        .write(SP, ADDR_LSB)
+        .write(SP + 1, ADDR_MSB)
+        .build();
+    let mut cpu = CPU::builder().sp(SP).ime(false).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 4);
+    assert_eq!(cpu.get_sp(), SP + 2);
+    assert_eq!(cpu.get_pc(), construct_u16(ADDR_LSB, ADDR_MSB));
+    assert!(cpu.get_ime());
 }
 
 /// RLA (0x17) & RRA (0x1F)

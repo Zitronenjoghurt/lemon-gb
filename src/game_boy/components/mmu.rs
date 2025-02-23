@@ -1,3 +1,4 @@
+use crate::enums::interrupts::Interrupt;
 use crate::game_boy::components::cartridge::header::CartridgeHeader;
 use crate::game_boy::components::cartridge::Cartridge;
 use crate::game_boy::components::mmu::builder::MMUBuilder;
@@ -63,6 +64,8 @@ pub const DIV_ADDRESS: u16 = 0xFF04;
 pub const TIMA_ADDRESS: u16 = 0xFF05;
 pub const TMA_ADDRESS: u16 = 0xFF06;
 pub const TAC_ADDRESS: u16 = 0xFF07;
+pub const IF_ADDRESS: u16 = 0xFF0F;
+pub const IE_ADDRESS: u16 = 0xFFFF;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MMU {
@@ -207,6 +210,13 @@ impl MMU {
             }
             _ => {}
         }
+    }
+
+    /// Fetches an interrupt by the provided priority and resets the IF flag
+    pub fn get_interrupt(&mut self) -> Option<Interrupt> {
+        let i_enable = self.get_ie_register();
+        let i_flag = self.read(IF_ADDRESS);
+        Interrupt::from_ie_if(i_enable & i_flag)
     }
 }
 

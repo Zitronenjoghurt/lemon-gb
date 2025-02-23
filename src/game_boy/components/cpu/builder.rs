@@ -17,6 +17,16 @@ impl CpuBuilder {
         self.cpu.set_registers(self.registers.clone());
         self.cpu
     }
+
+    pub fn ime(mut self, value: bool) -> Self {
+        self.cpu.ime = value;
+        self
+    }
+
+    pub fn deferred_set_ime(mut self, value: bool) -> Self {
+        self.cpu.deferred_set_ime = value;
+        self
+    }
 }
 
 impl CpuRegistersAccessTrait for CpuBuilder {

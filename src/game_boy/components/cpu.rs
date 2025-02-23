@@ -2,7 +2,7 @@ use crate::enums::parameter_groups::R16Stack;
 use crate::enums::parameter_groups::{JumpCondition, R16Mem, R16, R8};
 use crate::game_boy::components::cpu::builder::CpuBuilder;
 use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
-use crate::game_boy::components::mmu::MMU;
+use crate::game_boy::components::mmu::{IF_ADDRESS, MMU};
 use crate::helpers::bit_operations::*;
 use crate::instructions::Instruction;
 use registers::CPURegisters;
@@ -19,6 +19,8 @@ pub struct CPU {
     /// Interrupt Master Enable Flag
     /// When this flag is enabled, interrupts will be acknowledged, else they will be ignored
     ime: bool,
+    /// True if the IME is to be set after handling the current instruction
+    deferred_set_ime: bool,
 }
 
 impl CPU {
@@ -43,6 +45,8 @@ impl CPU {
             Instruction::DAA => self.decimal_adjust_accumulator(),
             Instruction::DecR8(r8) => self.decrement_r8(r8, mmu),
             Instruction::DecR16(r16) => self.decrement_r16(r16),
+            Instruction::DisableInterrupts => self.disable_interrupts(),
+            Instruction::EnableInterrupts => self.enable_interrupts(),
             Instruction::IncR8(r8) => self.increment_r8(r8, mmu),
             Instruction::IncR16(r16) => self.increment_r16(r16),
             Instruction::JpHL => self.jump_hl(),
@@ -58,6 +62,9 @@ impl CPU {
             Instruction::Nop => self.instruction_result(1, 1),
             Instruction::PopR16(r16_stack) => self.pop_r16(r16_stack, mmu),
             Instruction::PushR16(r16_stack) => self.push_r16(r16_stack, mmu),
+            Instruction::Return => self.return_from_func(mmu),
+            Instruction::ReturnCondition(cond) => self.return_from_func_cond(cond, mmu),
+            Instruction::ReturnEnableInterrupts => self.return_from_func_enable_interrupts(mmu),
             Instruction::RotateLeftA => self.rotate_left_a(),
             Instruction::RotateRightA => self.rotate_right_a(),
             Instruction::RotateLeftCarryA => self.rotate_left_carry_a(),
@@ -67,6 +74,14 @@ impl CPU {
     }
 
     pub fn step(&mut self, mmu: &mut MMU) -> u8 {
+        // This helps checking if the deferred set of the ime was already scheduled before the current instruction
+        let initial_deferred_set_ime = self.get_deferred_set_ime();
+
+        let has_interrupt = self.ime && self.handle_interrupts(mmu);
+        if has_interrupt {
+            return 5; // The interrupt handling takes 5 m-cycles
+        }
+
         let mut instruction_byte = mmu.read(self.get_pc());
         let prefixed = instruction_byte == PREFIX_INSTRUCTION_BYTE;
         if prefixed {
@@ -77,11 +92,39 @@ impl CPU {
         let (next_pc, m_cycles) = self.execute(instruction, mmu);
         self.set_pc(next_pc);
 
+        if initial_deferred_set_ime && self.deferred_set_ime {
+            self.deferred_set_ime = false;
+            self.ime = true;
+        }
+
         m_cycles
+    }
+
+    fn handle_interrupts(&mut self, mmu: &mut MMU) -> bool {
+        let Some(interrupt) = mmu.get_interrupt() else {
+            return false;
+        };
+
+        let new_i_flag = set_bit_u8(mmu.read(IF_ADDRESS), interrupt.get_if_index(), false);
+        mmu.write(IF_ADDRESS, new_i_flag);
+        self.ime = false;
+
+        self.push_u16(self.get_pc(), mmu);
+        self.set_pc(interrupt.get_target_address());
+
+        true
     }
 
     pub fn set_registers(&mut self, registers: CPURegisters) {
         self.registers = registers;
+    }
+
+    pub fn get_ime(&self) -> bool {
+        self.ime
+    }
+
+    pub fn get_deferred_set_ime(&self) -> bool {
+        self.deferred_set_ime
     }
 }
 
@@ -171,6 +214,17 @@ impl CPU {
         self.instruction_result(1, 2)
     }
 
+    pub fn disable_interrupts(&mut self) -> (u16, u8) {
+        self.ime = false;
+        self.deferred_set_ime = false;
+        self.instruction_result(1, 1)
+    }
+
+    pub fn enable_interrupts(&mut self) -> (u16, u8) {
+        self.deferred_set_ime = true;
+        self.instruction_result(1, 1)
+    }
+
     pub fn increment_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
         self.set_r8(r8, self.get_r8(r8, mmu).wrapping_add(1), mmu);
         let m = if r8 == R8::HL { 3 } else { 1 };
@@ -225,18 +279,14 @@ impl CPU {
     }
 
     pub fn pop_r16(&mut self, r16_stack: R16Stack, mmu: &MMU) -> (u16, u8) {
-        let lsb = self.pop(mmu);
-        let msb = self.pop(mmu);
-        let value = construct_u16(lsb, msb);
+        let value = self.pop_u16(mmu);
         self.set_r16_stack(r16_stack, value);
         self.instruction_result(1, 3)
     }
 
     pub fn push_r16(&mut self, r16_stack: R16Stack, mmu: &mut MMU) -> (u16, u8) {
         let value = self.get_r16_stack(r16_stack);
-        let (lsb, msb) = deconstruct_u16(value);
-        self.push(msb, mmu);
-        self.push(lsb, mmu);
+        self.push_u16(value, mmu);
         self.instruction_result(1, 4)
     }
 
@@ -275,6 +325,26 @@ impl CPU {
         }
     }
 
+    pub fn return_from_func(&mut self, mmu: &MMU) -> (u16, u8) {
+        let return_to_pc = self.pop_u16(mmu);
+        self.instruction_result(return_to_pc, 4)
+    }
+
+    pub fn return_from_func_cond(&mut self, condition: JumpCondition, mmu: &MMU) -> (u16, u8) {
+        let should_jump = self.check_jump_condition(condition);
+        if should_jump {
+            let (new_pc, _) = self.return_from_func(mmu);
+            self.instruction_result(new_pc, 5)
+        } else {
+            self.instruction_result(1, 2)
+        }
+    }
+
+    pub fn return_from_func_enable_interrupts(&mut self, mmu: &MMU) -> (u16, u8) {
+        self.ime = true;
+        self.return_from_func(mmu)
+    }
+
     pub fn rotate_left_a(&mut self) -> (u16, u8) {
         let (new_a, new_carry) = rotate_left_through_carry_u8(self.get_a(), self.get_f_carry());
         self.update_a_and_flags_after_rotation(new_a, new_carry);
@@ -309,15 +379,27 @@ impl CPU {
 
 /// Basic operations
 impl CPU {
-    pub fn pop(&mut self, mmu: &MMU) -> u8 {
+    pub fn pop_u8(&mut self, mmu: &MMU) -> u8 {
         let value = mmu.read(self.get_sp());
         self.increment_sp();
         value
     }
 
-    pub fn push(&mut self, value: u8, mmu: &mut MMU) {
+    pub fn pop_u16(&mut self, mmu: &MMU) -> u16 {
+        let lsb = self.pop_u8(mmu);
+        let msb = self.pop_u8(mmu);
+        construct_u16(lsb, msb)
+    }
+
+    pub fn push_u8(&mut self, value: u8, mmu: &mut MMU) {
         self.decrement_sp();
         mmu.write(self.get_sp(), value);
+    }
+
+    pub fn push_u16(&mut self, value: u16, mmu: &mut MMU) {
+        let (lsb, msb) = deconstruct_u16(value);
+        self.push_u8(msb, mmu);
+        self.push_u8(lsb, mmu);
     }
 }
 

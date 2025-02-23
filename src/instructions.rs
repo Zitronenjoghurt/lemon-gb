@@ -19,6 +19,10 @@ pub enum Instruction {
     DecR8(R8),
     /// Decrement the specified register
     DecR16(R16),
+    /// Disables interrupts immediately
+    DisableInterrupts,
+    /// Enables interrupts after the next instruction
+    EnableInterrupts,
     /// Increment the specified register
     IncR8(R8),
     /// Increment the specified register
@@ -54,6 +58,12 @@ pub enum Instruction {
     PopR16(R16Stack),
     /// Push 2 bytes from the specified register to the stack
     PushR16(R16Stack),
+    /// Return from a previous function call
+    Return,
+    /// Return from a previous function call if a certain condition is met
+    ReturnCondition(JumpCondition),
+    /// Return from a previous function call and enable interrupts
+    ReturnEnableInterrupts,
     /// Rotate register A left by 1 bit, through the carry flag
     /// ```
     ///   ┏━ Flags ━┓ ┏━━━━━━━ A ━━━━━━━┓
@@ -172,20 +182,28 @@ impl Instruction {
             0b1000_0101 => Ok(Instruction::AddR8(R8::L)),          // 0x85
             0b1000_0110 => Ok(Instruction::AddR8(R8::HL)),         // 0x86
             0b1000_0111 => Ok(Instruction::AddR8(R8::A)),          // 0x87
+            0b1100_0000 => Ok(Instruction::ReturnCondition(JumpCondition::NotZero)), // 0xC0
             0b1100_0001 => Ok(Instruction::PopR16(R16Stack::BC)),  // 0xC1
             0b1100_0010 => Ok(Instruction::JpCondImm16(JumpCondition::NotZero)), // 0xC2
             0b1100_0011 => Ok(Instruction::JpImm16),               // 0xC3
             0b1100_0101 => Ok(Instruction::PushR16(R16Stack::BC)), // 0xC5
+            0b1100_1000 => Ok(Instruction::ReturnCondition(JumpCondition::Zero)), // 0xC8
+            0b1100_1001 => Ok(Instruction::Return),                // 0xC9
             0b1100_1010 => Ok(Instruction::JpCondImm16(JumpCondition::Zero)), // 0xCA
+            0b1101_0000 => Ok(Instruction::ReturnCondition(JumpCondition::NotCarry)), // 0xD0
             0b1101_0001 => Ok(Instruction::PopR16(R16Stack::DE)),  // 0xD1
             0b1101_0010 => Ok(Instruction::JpCondImm16(JumpCondition::NotCarry)), // 0xD2
             0b1101_0101 => Ok(Instruction::PushR16(R16Stack::DE)), // 0xD5
+            0b1101_1000 => Ok(Instruction::ReturnCondition(JumpCondition::Carry)), // 0xD8
+            0b1101_1001 => Ok(Instruction::ReturnEnableInterrupts), // 0xD9
             0b1101_1010 => Ok(Instruction::JpCondImm16(JumpCondition::Carry)), // 0xDA
             0b1110_0001 => Ok(Instruction::PopR16(R16Stack::HL)),  // 0xE1
             0b1110_0101 => Ok(Instruction::PushR16(R16Stack::HL)), // 0xE5
             0b1110_1001 => Ok(Instruction::JpHL),                  // 0xE9
             0b1111_0001 => Ok(Instruction::PopR16(R16Stack::AF)),  // 0xF1
+            0b1111_0011 => Ok(Instruction::DisableInterrupts),     // 0xF3
             0b1111_0101 => Ok(Instruction::PushR16(R16Stack::AF)), // 0xF5
+            0b1111_1011 => Ok(Instruction::EnableInterrupts),      // 0xFB
             _ => Err(format!("Unknown unprefixed instruction byte: {:02X}", byte).into()),
         }
     }
@@ -217,7 +235,12 @@ impl Instruction {
             | Self::RotateLeftCarryA
             | Self::RotateRightCarryA
             | Self::SetCarryFlag
-            | Self::DAA => 1,
+            | Self::DAA
+            | Self::DisableInterrupts
+            | Self::EnableInterrupts
+            | Self::Return
+            | Self::ReturnCondition(_)
+            | Self::ReturnEnableInterrupts => 1,
             Self::LoadR8Imm8(_) | Self::JrImm8 | Self::JrCondImm8(_) => 2,
             Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
@@ -270,6 +293,8 @@ impl Instruction {
             Self::DAA => "DAA".into(),
             Self::DecR8(r8) => format!("DEC {r8}"),
             Self::DecR16(r16) => format!("DEC {r16}"),
+            Self::DisableInterrupts => "DI".into(),
+            Self::EnableInterrupts => "EI".into(),
             Self::IncR8(r8) => format!("INC {r8}"),
             Self::IncR16(r16) => format!("INC {r16}"),
             Self::JpHL => "JP HL".into(),
@@ -284,6 +309,9 @@ impl Instruction {
             Self::LoadImm16SP => format!("LD 0x{:02X}{:02X}, SP", msb, lsb),
             Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
             Self::PushR16(r16_stack) => format!("PUSH {r16_stack}"),
+            Self::Return => "RET".into(),
+            Self::ReturnCondition(cond) => format!("RET {cond}"),
+            Self::ReturnEnableInterrupts => "RETI".into(),
             Self::RotateLeftA => "RLA".into(),
             Self::RotateRightA => "RRA".into(),
             Self::RotateLeftCarryA => "RLCA".into(),
@@ -303,6 +331,8 @@ impl Instruction {
             Self::DAA => "Decimal adjust value in register A to be valid BCD".into(),
             Self::DecR8(r8) => format!("Decrement register {r8}"),
             Self::DecR16(r16) => format!("Decrement register {r16}"),
+            Self::DisableInterrupts => "Disable interrupts".into(),
+            Self::EnableInterrupts => "Enable interrupts after the next instruction".into(),
             Self::IncR8(r8) => format!("Increment register {r8}"),
             Self::IncR16(r16) => format!("Increment register {r16}"),
             Self::JpHL => "Jump to the address specified in register HL".into(),
@@ -358,6 +388,13 @@ impl Instruction {
             }
             Self::PopR16(r16_stack) => format!("Pop value from stack into register {r16_stack}"),
             Self::PushR16(r16_stack) => format!("Push value in {r16_stack} onto the stack"),
+            Self::Return => "Return from a called function".into(),
+            Self::ReturnCondition(cond) => {
+                format!("If {}, return from a called function", cond.description())
+            }
+            Self::ReturnEnableInterrupts => {
+                "Return from a called function and enable interrupts".into()
+            }
             Self::RotateLeftA => "Rotate register A left THROUGH the carry flag".into(),
             Self::RotateRightA => "Rotate register A right THROUGH the carry flag".into(),
             Self::RotateLeftCarryA => "Rotate register A left, update carry flag".into(),
