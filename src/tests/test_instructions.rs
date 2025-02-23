@@ -267,6 +267,48 @@ fn test_ccf() {
     assert!(cpu.get_f_zero());
 }
 
+/// DAA (0x27)
+#[rstest] // Also check zero flag
+#[case::add_nc_nhc(0x6B, false, false, false, 0x71, false)] // 0x42 + 0x29 =(DAA)> 0x71
+#[case::add_c_nhc(0x14, false, true, false, 0x74, true)] // 0x91 + 0x83 =(DAA)> 0x74
+#[case::add_nc_hc(0x81, false, false, true, 0x87, false)] // 0x59 + 0x28 =(DAA)> 0x87
+#[case::add_c_hc(0x32, false, true, true, 0x98, true)] // 0x99 + 0x99 =(DAA)> 0x98
+#[case::sub_nc_nhc(0x20, true, false, false, 0x20, false)] // 0x42 - 0x22 =(DAA)> 0x20
+#[case::sub_c_nhc(0xE1, true, true, false, 0x81, true)] // 0x53 - 0x72 =(DAA)> 0x81
+#[case::sub_nc_hc(0x0E, true, false, true, 0x08, false)] // 0x35 - 0x27 =(DAA)> 0x08
+#[case::sub_c_hc(0xBE, true, true, true, 0x58, true)] // 0x35 - 0x77 =(DAA)> 0x58
+fn test_daa(
+    #[case] value: u8,
+    #[case] subtract: bool,
+    #[case] carry: bool,
+    #[case] half_carry: bool,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, 0x27).build();
+    let mut cpu = CPU::builder()
+        .a(value)
+        .f_subtract(subtract)
+        .f_carry(carry)
+        .f_half_carry(half_carry)
+        .f_zero(false)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert_eq!(cpu.get_f_subtract(), subtract);
+    assert!(!cpu.get_f_half_carry());
+
+    if expected_value == 0 {
+        assert!(cpu.get_f_zero());
+    } else {
+        assert!(!cpu.get_f_zero());
+    }
+}
+
 /// DEC r8 (except HL)
 #[rstest]
 #[case::decrement_b(0x05, 23)]

@@ -40,6 +40,7 @@ impl CPU {
             Instruction::AddR8(r8) => self.add_r8(r8, mmu),
             Instruction::ComplementA => self.complement_a(),
             Instruction::ComplementCarryFlag => self.complement_carry(),
+            Instruction::DAA => self.decimal_adjust_accumulator(),
             Instruction::DecR8(r8) => self.decrement_r8(r8, mmu),
             Instruction::DecR16(r16) => self.decrement_r16(r16),
             Instruction::IncR8(r8) => self.increment_r8(r8, mmu),
@@ -123,6 +124,39 @@ impl CPU {
         self.set_f_carry(!self.get_f_carry());
         self.set_f_subtract(false);
         self.set_f_half_carry(false);
+        self.instruction_result(1, 1)
+    }
+
+    pub fn decimal_adjust_accumulator(&mut self) -> (u16, u8) {
+        let current_a = self.get_a();
+        let mut new_carry = self.get_f_carry();
+        let mut adjustment: u8 = 0;
+
+        //let mut new_carry = false;
+        let new_a = if self.get_f_subtract() {
+            if self.get_f_half_carry() {
+                adjustment += 0x06;
+            }
+            if self.get_f_carry() {
+                adjustment += 0x60;
+            }
+            current_a.wrapping_sub(adjustment)
+        } else {
+            if self.get_f_half_carry() || current_a & 0xF > 0x9 {
+                adjustment += 0x06;
+            }
+            if self.get_f_carry() || current_a > 0x99 {
+                adjustment += 0x60;
+                new_carry = true;
+            }
+            current_a.wrapping_add(adjustment)
+        };
+
+        self.set_a(new_a);
+        self.set_f_carry(new_carry);
+        self.set_f_half_carry(false);
+        self.set_f_zero(new_a == 0);
+
         self.instruction_result(1, 1)
     }
 

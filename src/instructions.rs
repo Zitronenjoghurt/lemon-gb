@@ -12,6 +12,9 @@ pub enum Instruction {
     ComplementA,
     /// Negates the carry flag
     ComplementCarryFlag,
+    /// To be used after an addition or subtraction
+    /// Will adjust the result in register A to be valid BCD (Binary-Coded Decimal)
+    DAA,
     /// Decrement the specified register
     DecR8(R8),
     /// Decrement the specified register
@@ -136,6 +139,7 @@ impl Instruction {
             0b0010_0100 => Ok(Instruction::IncR8(R8::H)),          // 0x24
             0b0010_0101 => Ok(Instruction::DecR8(R8::H)),          // 0x25
             0b0010_0110 => Ok(Instruction::LoadR8Imm8(R8::H)),     // 0x26
+            0b0010_0111 => Ok(Instruction::DAA),                   // 0x27
             0b0010_1000 => Ok(Instruction::JrCondImm8(JumpCondition::Zero)), // 0x28
             0b0010_1001 => Ok(Instruction::AddHLR16(R16::HL)),     // 0x29
             0b0010_1111 => Ok(Instruction::ComplementA),           // 0x2F
@@ -212,7 +216,8 @@ impl Instruction {
             | Self::RotateRightA
             | Self::RotateLeftCarryA
             | Self::RotateRightCarryA
-            | Self::SetCarryFlag => 1,
+            | Self::SetCarryFlag
+            | Self::DAA => 1,
             Self::LoadR8Imm8(_) | Self::JrImm8 | Self::JrCondImm8(_) => 2,
             Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
@@ -262,6 +267,7 @@ impl Instruction {
             Self::AddR8(r8) => format!("ADD A, {r8}"),
             Self::ComplementA => "CPL".into(),
             Self::ComplementCarryFlag => "CCF".into(),
+            Self::DAA => "DAA".into(),
             Self::DecR8(r8) => format!("DEC {r8}"),
             Self::DecR16(r16) => format!("DEC {r16}"),
             Self::IncR8(r8) => format!("INC {r8}"),
@@ -294,6 +300,7 @@ impl Instruction {
             Self::AddR8(r8) => format!("Add value from register {r8} to register A"),
             Self::ComplementA => "Negate register A bitwise".into(),
             Self::ComplementCarryFlag => "Complement the carry flag in the F register".into(),
+            Self::DAA => "Decimal adjust value in register A to be valid BCD".into(),
             Self::DecR8(r8) => format!("Decrement register {r8}"),
             Self::DecR16(r16) => format!("Decrement register {r16}"),
             Self::IncR8(r8) => format!("Increment register {r8}"),
