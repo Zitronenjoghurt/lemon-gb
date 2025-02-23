@@ -232,6 +232,41 @@ fn test_add_hl_r16(
     assert!(cpu.get_f_zero());
 }
 
+/// CPL (0x2F)
+#[test]
+fn test_cpl() {
+    let mut mmu = MMU::builder().rom(0, 0x2F).build();
+    let mut cpu = CPU::builder().a(0b1010_1010).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), 0b0101_0101);
+    assert!(cpu.get_f_subtract());
+    assert!(cpu.get_f_half_carry());
+    assert!(!cpu.get_f_carry());
+    assert!(!cpu.get_f_zero());
+}
+
+/// CCF (0x3F)
+#[test]
+fn test_ccf() {
+    let mut mmu = MMU::builder().rom(0, 0x3F).build();
+    let mut cpu = CPU::builder()
+        .f_subtract(true)
+        .f_half_carry(true)
+        .f_zero(true)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+    assert!(cpu.get_f_carry());
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_half_carry());
+    assert!(cpu.get_f_zero());
+}
+
 /// DEC r8 (except HL)
 #[rstest]
 #[case::decrement_b(0x05, 23)]
@@ -729,4 +764,90 @@ fn test_pop_r16(
         0xF1 => assert_eq!(cpu.get_af(), expected_value),
         _ => panic!("Unexpected opcode"),
     }
+}
+
+/// RLA (0x17) & RRA (0x1F)
+#[rstest]
+#[case::left_nc_nc(0x17, 0b0110_0110, false, 0b1100_1100, false)]
+#[case::left_c_nc(0x17, 0b0110_0110, true, 0b1100_1101, false)]
+#[case::left_nc_c(0x17, 0b1110_0110, false, 0b1100_1100, true)]
+#[case::left_c_c(0x17, 0b1110_0110, true, 0b1100_1101, true)]
+#[case::right_nc_nc(0x1F, 0b0110_0110, false, 0b0011_0011, false)]
+#[case::right_c_nc(0x1F, 0b0110_0110, true, 0b1011_0011, false)]
+#[case::right_nc_c(0x1F, 0b0110_0111, false, 0b0011_0011, true)]
+#[case::right_c_c(0x1F, 0b0110_0111, true, 0b1011_0011, true)]
+fn test_rla_rra(
+    #[case] opcode: u8,
+    #[case] value: u8,
+    #[case] carry: bool,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .a(value)
+        .f_carry(carry)
+        .f_subtract(true)
+        .f_half_carry(true)
+        .f_zero(true)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_half_carry());
+    assert!(!cpu.get_f_zero());
+}
+
+/// RLCA (0x07) & RRCA (0x0F)
+#[rstest]
+#[case::left_nc(0x07, 0b0110_0110, 0b1100_1100, false)]
+#[case::left_c(0x07, 0b1110_0110, 0b1100_1101, true)]
+#[case::right_nc(0x0F, 0b0110_0110, 0b0011_0011, false)]
+#[case::right_c(0x0F, 0b0110_0111, 0b1011_0011, true)]
+fn test_rlca_rrca(
+    #[case] opcode: u8,
+    #[case] value: u8,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .a(value)
+        .f_subtract(true)
+        .f_half_carry(true)
+        .f_zero(true)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_half_carry());
+    assert!(!cpu.get_f_zero());
+}
+
+/// SCF (0x37)
+#[test]
+fn test_scf() {
+    let mut mmu = MMU::builder().rom(0, 0x37).build();
+    let mut cpu = CPU::builder()
+        .f_carry(false)
+        .f_subtract(true)
+        .f_half_carry(true)
+        .f_zero(true)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+    assert!(cpu.get_f_carry());
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_half_carry());
+    assert!(cpu.get_f_zero());
 }

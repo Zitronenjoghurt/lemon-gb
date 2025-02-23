@@ -28,7 +28,7 @@ WORK IN PROGRESS, not launchable yet
 
 ### Components
 
-- 🚧 CPU (78/501 Instructions)
+- 🚧 CPU (85/501 Instructions)
 - ✅ Timer
 - 🚧 MMU (see memory banking)
 - ❌ PPU

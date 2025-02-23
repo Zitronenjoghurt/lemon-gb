@@ -8,6 +8,10 @@ pub enum Instruction {
     AddHLR16(R16),
     /// Add the specified register to register A
     AddR8(R8),
+    /// Complement register A => bitwise NOT
+    ComplementA,
+    /// Negates the carry flag
+    ComplementCarryFlag,
     /// Decrement the specified register
     DecR8(R8),
     /// Decrement the specified register
@@ -47,6 +51,40 @@ pub enum Instruction {
     PopR16(R16Stack),
     /// Push 2 bytes from the specified register to the stack
     PushR16(R16Stack),
+    /// Rotate register A left by 1 bit, through the carry flag
+    /// ```
+    ///   ┏━ Flags ━┓ ┏━━━━━━━ A ━━━━━━━┓
+    /// ┌─╂─   C   ←╂─╂─ b7 ← ... ← b0 ←╂─┐
+    /// │ ┗━━━━━━━━━┛ ┗━━━━━━━━━━━━━━━━━┛ │
+    /// └─────────────────────────────────┘
+    /// ```
+    RotateLeftA,
+    /// Rotate register A right by 1 bit, through the carry flag
+    /// ```
+    ///   ┏━━━━━━━ A ━━━━━━━┓ ┏━ Flags ━┓
+    /// ┌─╂→ b7 → ... → b0 ─╂─╂→   C   ─╂─┐
+    /// │ ┗━━━━━━━━━━━━━━━━━┛ ┗━━━━━━━━━┛ │
+    /// └─────────────────────────────────┘
+    /// ```
+    RotateRightA,
+    /// Rotate register A left by 1 bit
+    /// ```
+    /// ┏━ Flags ━┓   ┏━━━━━━━ A ━━━━━━━┓
+    /// ┃    C   ←╂─┬─╂─ b7 ← ... ← b0 ←╂─┐
+    /// ┗━━━━━━━━━┛ │ ┗━━━━━━━━━━━━━━━━━┛ │
+    ///             └─────────────────────┘
+    /// ```
+    RotateLeftCarryA,
+    /// Rotate register A right by 1 bit
+    /// ```
+    ///   ┏━━━━━━━ A ━━━━━━━┓   ┏━ Flags ━┓
+    /// ┌─╂→ b7 → ... → b0 ─╂─┬─╂→   C    ┃
+    /// │ ┗━━━━━━━━━━━━━━━━━┛ │ ┗━━━━━━━━━┛
+    /// └─────────────────────┘
+    /// ```
+    RotateRightCarryA,
+    /// Sets the carry flag to 1
+    SetCarryFlag,
 }
 
 impl Instruction {
@@ -67,6 +105,7 @@ impl Instruction {
             0b0000_0100 => Ok(Instruction::IncR8(R8::B)),          // 0x04
             0b0000_0101 => Ok(Instruction::DecR8(R8::B)),          // 0x05
             0b0000_0110 => Ok(Instruction::LoadR8Imm8(R8::B)),     // 0x06
+            0b0000_0111 => Ok(Instruction::RotateLeftCarryA),      // 0x07
             0b0000_1000 => Ok(Instruction::LoadImm16SP),           // 0x08
             0b0000_1001 => Ok(Instruction::AddHLR16(R16::BC)),     // 0x09
             0b0000_1010 => Ok(Instruction::LoadAR16(R16Mem::BC)),  // 0x0A
@@ -74,12 +113,14 @@ impl Instruction {
             0b0000_1100 => Ok(Instruction::IncR8(R8::C)),          // 0x0C
             0b0000_1101 => Ok(Instruction::DecR8(R8::C)),          // 0x0D
             0b0000_1110 => Ok(Instruction::LoadR8Imm8(R8::C)),     // 0x0E
+            0b0000_1111 => Ok(Instruction::RotateRightCarryA),     // 0x0F
             0b0001_0001 => Ok(Instruction::LoadR16Imm16(R16::DE)), // 0x11
             0b0001_0010 => Ok(Instruction::LoadR16A(R16Mem::DE)),  // 0x12
             0b0001_0011 => Ok(Instruction::IncR16(R16::DE)),       // 0x13
             0b0001_0100 => Ok(Instruction::IncR8(R8::D)),          // 0x14
             0b0001_0101 => Ok(Instruction::DecR8(R8::D)),          // 0x15
             0b0001_0110 => Ok(Instruction::LoadR8Imm8(R8::D)),     // 0x16
+            0b0001_0111 => Ok(Instruction::RotateLeftA),           // 0x17
             0b0001_1000 => Ok(Instruction::JrImm8),                // 0x18
             0b0001_1001 => Ok(Instruction::AddHLR16(R16::DE)),     // 0x19
             0b0001_1010 => Ok(Instruction::LoadAR16(R16Mem::DE)),  // 0x1A
@@ -87,6 +128,7 @@ impl Instruction {
             0b0001_1100 => Ok(Instruction::IncR8(R8::E)),          // 0x1C
             0b0001_1101 => Ok(Instruction::DecR8(R8::E)),          // 0x1D
             0b0001_1110 => Ok(Instruction::LoadR8Imm8(R8::E)),     // 0x1E
+            0b0001_1111 => Ok(Instruction::RotateRightA),          // 0x1F
             0b0010_0000 => Ok(Instruction::JrCondImm8(JumpCondition::NotZero)), // 0x20
             0b0010_0001 => Ok(Instruction::LoadR16Imm16(R16::HL)), // 0x21
             0b0010_0010 => Ok(Instruction::LoadR16A(R16Mem::HLI)), // 0x22
@@ -96,6 +138,7 @@ impl Instruction {
             0b0010_0110 => Ok(Instruction::LoadR8Imm8(R8::H)),     // 0x26
             0b0010_1000 => Ok(Instruction::JrCondImm8(JumpCondition::Zero)), // 0x28
             0b0010_1001 => Ok(Instruction::AddHLR16(R16::HL)),     // 0x29
+            0b0010_1111 => Ok(Instruction::ComplementA),           // 0x2F
             0b0011_0000 => Ok(Instruction::JrCondImm8(JumpCondition::NotCarry)), // 0x30
             0b0010_1010 => Ok(Instruction::LoadAR16(R16Mem::HLI)), // 0x2A
             0b0010_1011 => Ok(Instruction::DecR16(R16::HL)),       // 0x2B
@@ -108,6 +151,7 @@ impl Instruction {
             0b0011_0100 => Ok(Instruction::IncR8(R8::HL)),         // 0x34
             0b0011_0101 => Ok(Instruction::DecR8(R8::HL)),         // 0x35
             0b0011_0110 => Ok(Instruction::LoadR8Imm8(R8::HL)),    // 0x36
+            0b0011_0111 => Ok(Instruction::SetCarryFlag),          // 0x37
             0b0011_1000 => Ok(Instruction::JrCondImm8(JumpCondition::Carry)), // 0x38
             0b0011_1001 => Ok(Instruction::AddHLR16(R16::SP)),     // 0x39
             0b0011_1010 => Ok(Instruction::LoadAR16(R16Mem::HLD)), // 0x3A
@@ -115,6 +159,7 @@ impl Instruction {
             0b0011_1100 => Ok(Instruction::IncR8(R8::A)),          // 0x3C
             0b0011_1101 => Ok(Instruction::DecR8(R8::A)),          // 0x3D
             0b0011_1110 => Ok(Instruction::LoadR8Imm8(R8::A)),     // 0x3E
+            0b0011_1111 => Ok(Instruction::ComplementCarryFlag),   // 0x3F
             0b1000_0000 => Ok(Instruction::AddR8(R8::B)),          // 0x80
             0b1000_0001 => Ok(Instruction::AddR8(R8::C)),          // 0x81
             0b1000_0010 => Ok(Instruction::AddR8(R8::D)),          // 0x82
@@ -160,7 +205,14 @@ impl Instruction {
             | Self::DecR16(_)
             | Self::IncR8(_)
             | Self::DecR8(_)
-            | Self::AddHLR16(_) => 1,
+            | Self::AddHLR16(_)
+            | Self::ComplementA
+            | Self::ComplementCarryFlag
+            | Self::RotateLeftA
+            | Self::RotateRightA
+            | Self::RotateLeftCarryA
+            | Self::RotateRightCarryA
+            | Self::SetCarryFlag => 1,
             Self::LoadR8Imm8(_) | Self::JrImm8 | Self::JrCondImm8(_) => 2,
             Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
@@ -208,6 +260,8 @@ impl Instruction {
             Self::Nop => "NOP".into(),
             Self::AddHLR16(r16) => format!("ADD HL, {r16}"),
             Self::AddR8(r8) => format!("ADD A, {r8}"),
+            Self::ComplementA => "CPL".into(),
+            Self::ComplementCarryFlag => "CCF".into(),
             Self::DecR8(r8) => format!("DEC {r8}"),
             Self::DecR16(r16) => format!("DEC {r16}"),
             Self::IncR8(r8) => format!("INC {r8}"),
@@ -224,6 +278,11 @@ impl Instruction {
             Self::LoadImm16SP => format!("LD 0x{:02X}{:02X}, SP", msb, lsb),
             Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
             Self::PushR16(r16_stack) => format!("PUSH {r16_stack}"),
+            Self::RotateLeftA => "RLA".into(),
+            Self::RotateRightA => "RRA".into(),
+            Self::RotateLeftCarryA => "RLCA".into(),
+            Self::RotateRightCarryA => "RRCA".into(),
+            Self::SetCarryFlag => "SCF".into(),
         }
     }
 
@@ -233,6 +292,8 @@ impl Instruction {
             Self::Nop => "No Operation".into(),
             Self::AddHLR16(r16) => format!("Add value from register {r16} to register HL"),
             Self::AddR8(r8) => format!("Add value from register {r8} to register A"),
+            Self::ComplementA => "Negate register A bitwise".into(),
+            Self::ComplementCarryFlag => "Complement the carry flag in the F register".into(),
             Self::DecR8(r8) => format!("Decrement register {r8}"),
             Self::DecR16(r16) => format!("Decrement register {r16}"),
             Self::IncR8(r8) => format!("Increment register {r8}"),
@@ -290,6 +351,11 @@ impl Instruction {
             }
             Self::PopR16(r16_stack) => format!("Pop value from stack into register {r16_stack}"),
             Self::PushR16(r16_stack) => format!("Push value in {r16_stack} onto the stack"),
+            Self::RotateLeftA => "Rotate register A left THROUGH the carry flag".into(),
+            Self::RotateRightA => "Rotate register A right THROUGH the carry flag".into(),
+            Self::RotateLeftCarryA => "Rotate register A left, update carry flag".into(),
+            Self::RotateRightCarryA => "Rotate register A right, update carry flag".into(),
+            Self::SetCarryFlag => "Set carry flag".into(),
         }
     }
 }

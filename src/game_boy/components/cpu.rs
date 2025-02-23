@@ -3,7 +3,7 @@ use crate::enums::parameter_groups::{JumpCondition, R16Mem, R16, R8};
 use crate::game_boy::components::cpu::builder::CpuBuilder;
 use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
 use crate::game_boy::components::mmu::MMU;
-use crate::helpers::bit_operations::{add_carry_u16, add_carry_u8, construct_u16, deconstruct_u16};
+use crate::helpers::bit_operations::*;
 use crate::instructions::Instruction;
 use registers::CPURegisters;
 
@@ -38,6 +38,8 @@ impl CPU {
         match instruction {
             Instruction::AddHLR16(r16) => self.add_hl_r16(r16),
             Instruction::AddR8(r8) => self.add_r8(r8, mmu),
+            Instruction::ComplementA => self.complement_a(),
+            Instruction::ComplementCarryFlag => self.complement_carry(),
             Instruction::DecR8(r8) => self.decrement_r8(r8, mmu),
             Instruction::DecR16(r16) => self.decrement_r16(r16),
             Instruction::IncR8(r8) => self.increment_r8(r8, mmu),
@@ -55,6 +57,11 @@ impl CPU {
             Instruction::Nop => self.instruction_result(1, 1),
             Instruction::PopR16(r16_stack) => self.pop_r16(r16_stack, mmu),
             Instruction::PushR16(r16_stack) => self.push_r16(r16_stack, mmu),
+            Instruction::RotateLeftA => self.rotate_left_a(),
+            Instruction::RotateRightA => self.rotate_right_a(),
+            Instruction::RotateLeftCarryA => self.rotate_left_carry_a(),
+            Instruction::RotateRightCarryA => self.rotate_right_carry_a(),
+            Instruction::SetCarryFlag => self.set_carry_flag(),
         }
     }
 
@@ -103,6 +110,20 @@ impl CPU {
         self.set_f_carry(carry);
 
         self.instruction_result(1, 2)
+    }
+
+    pub fn complement_a(&mut self) -> (u16, u8) {
+        self.set_a(!self.get_a());
+        self.set_f_subtract(true);
+        self.set_f_half_carry(true);
+        self.instruction_result(1, 1)
+    }
+
+    pub fn complement_carry(&mut self) -> (u16, u8) {
+        self.set_f_carry(!self.get_f_carry());
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.instruction_result(1, 1)
     }
 
     pub fn decrement_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
@@ -219,6 +240,37 @@ impl CPU {
             self.instruction_result(2, 2)
         }
     }
+
+    pub fn rotate_left_a(&mut self) -> (u16, u8) {
+        let (new_a, new_carry) = rotate_left_through_carry_u8(self.get_a(), self.get_f_carry());
+        self.update_a_and_flags_after_rotation(new_a, new_carry);
+        self.instruction_result(1, 1)
+    }
+
+    pub fn rotate_right_a(&mut self) -> (u16, u8) {
+        let (new_a, new_carry) = rotate_right_through_carry_u8(self.get_a(), self.get_f_carry());
+        self.update_a_and_flags_after_rotation(new_a, new_carry);
+        self.instruction_result(1, 1)
+    }
+
+    pub fn rotate_left_carry_a(&mut self) -> (u16, u8) {
+        let (new_a, new_carry) = rotate_left_get_carry_u8(self.get_a());
+        self.update_a_and_flags_after_rotation(new_a, new_carry);
+        self.instruction_result(1, 1)
+    }
+
+    pub fn rotate_right_carry_a(&mut self) -> (u16, u8) {
+        let (new_a, new_carry) = rotate_right_get_carry_u8(self.get_a());
+        self.update_a_and_flags_after_rotation(new_a, new_carry);
+        self.instruction_result(1, 1)
+    }
+
+    pub fn set_carry_flag(&mut self) -> (u16, u8) {
+        self.set_f_carry(true);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.instruction_result(1, 1)
+    }
 }
 
 /// Basic operations
@@ -255,6 +307,14 @@ impl CPU {
         } else if r16_m == R16Mem::HLD {
             self.set_hl(self.get_hl().wrapping_sub(1));
         }
+    }
+
+    fn update_a_and_flags_after_rotation(&mut self, a: u8, new_carry: bool) {
+        self.set_a(a);
+        self.set_f_carry(new_carry);
+        self.set_f_zero(false);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
     }
 }
 
