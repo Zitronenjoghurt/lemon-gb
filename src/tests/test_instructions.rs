@@ -115,7 +115,7 @@ fn test_add_register(
     assert_eq!(cpu.get_registers().get_f_half_carry(), expected_hc);
     assert_eq!(cpu.get_registers().get_f_carry(), expected_c);
     assert_eq!(cpu.get_pc(), 1);
-    assert_eq!(m, 2);
+    assert_eq!(m, 1);
 }
 
 /// ADD HL (0x86)
@@ -153,7 +153,7 @@ fn test_add_hl(
     assert_eq!(cpu.get_registers().get_f_half_carry(), expected_hc);
     assert_eq!(cpu.get_registers().get_f_carry(), expected_c);
     assert_eq!(cpu.get_pc(), 1);
-    assert_eq!(m, 3);
+    assert_eq!(m, 2);
 }
 
 /// ADD A (0x87)
@@ -184,7 +184,114 @@ fn test_add_a(
     assert_eq!(cpu.get_registers().get_f_half_carry(), expected_hc);
     assert_eq!(cpu.get_registers().get_f_carry(), expected_c);
     assert_eq!(cpu.get_pc(), 1);
-    assert_eq!(m, 2);
+    assert_eq!(m, 1);
+}
+
+/// ADC r8
+#[rstest]
+#[case::b_nc_nc_nh(0x88, 0x23, 0x12, R8::B, false, 0x35, false, false, false)]
+#[case::b_c_nc_nh(0x88, 0x23, 0x12, R8::B, true, 0x36, false, false, false)]
+#[case::b_nc_c_nh(0x88, 0xF3, 0x12, R8::B, false, 0x05, true, false, false)]
+#[case::b_c_c_nh(0x88, 0xF3, 0x12, R8::B, true, 0x06, true, false, false)]
+#[case::b_nc_nc_h(0x88, 0x23, 0x1F, R8::B, false, 0x42, false, true, false)]
+#[case::b_c_nc_h(0x88, 0x23, 0x1F, R8::B, true, 0x43, false, true, false)]
+#[case::b_nc_c_h(0x88, 0xF3, 0x1F, R8::B, false, 0x12, true, true, false)]
+#[case::b_c_c_h(0x88, 0xF3, 0x1F, R8::B, true, 0x13, true, true, false)]
+#[case::b_zero(0x88, 0xFE, 0x01, R8::B, true, 0x00, true, true, true)]
+#[case::c_nc_nc_nh(0x89, 0x23, 0x12, R8::C, false, 0x35, false, false, false)]
+#[case::c_c_nc_nh(0x89, 0x23, 0x12, R8::C, true, 0x36, false, false, false)]
+#[case::c_nc_c_nh(0x89, 0xF3, 0x12, R8::C, false, 0x05, true, false, false)]
+#[case::c_c_c_nh(0x89, 0xF3, 0x12, R8::C, true, 0x06, true, false, false)]
+#[case::c_nc_nc_h(0x89, 0x23, 0x1F, R8::C, false, 0x42, false, true, false)]
+#[case::c_c_nc_h(0x89, 0x23, 0x1F, R8::C, true, 0x43, false, true, false)]
+#[case::c_nc_c_h(0x89, 0xF3, 0x1F, R8::C, false, 0x12, true, true, false)]
+#[case::c_c_c_h(0x89, 0xF3, 0x1F, R8::C, true, 0x13, true, true, false)]
+#[case::c_zero(0x89, 0xFE, 0x01, R8::C, true, 0x00, true, true, true)]
+#[case::d_nc_nc_nh(0x8A, 0x23, 0x12, R8::D, false, 0x35, false, false, false)]
+#[case::d_c_nc_nh(0x8A, 0x23, 0x12, R8::D, true, 0x36, false, false, false)]
+#[case::d_nc_c_nh(0x8A, 0xF3, 0x12, R8::D, false, 0x05, true, false, false)]
+#[case::d_c_c_nh(0x8A, 0xF3, 0x12, R8::D, true, 0x06, true, false, false)]
+#[case::d_nc_nc_h(0x8A, 0x23, 0x1F, R8::D, false, 0x42, false, true, false)]
+#[case::d_c_nc_h(0x8A, 0x23, 0x1F, R8::D, true, 0x43, false, true, false)]
+#[case::d_nc_c_h(0x8A, 0xF3, 0x1F, R8::D, false, 0x12, true, true, false)]
+#[case::d_c_c_h(0x8A, 0xF3, 0x1F, R8::D, true, 0x13, true, true, false)]
+#[case::d_zero(0x8A, 0xFE, 0x01, R8::D, true, 0x00, true, true, true)]
+#[case::e_nc_nc_nh(0x8B, 0x23, 0x12, R8::E, false, 0x35, false, false, false)]
+#[case::e_c_nc_nh(0x8B, 0x23, 0x12, R8::E, true, 0x36, false, false, false)]
+#[case::e_nc_c_nh(0x8B, 0xF3, 0x12, R8::E, false, 0x05, true, false, false)]
+#[case::e_c_c_nh(0x8B, 0xF3, 0x12, R8::E, true, 0x06, true, false, false)]
+#[case::e_nc_nc_h(0x8B, 0x23, 0x1F, R8::E, false, 0x42, false, true, false)]
+#[case::e_c_nc_h(0x8B, 0x23, 0x1F, R8::E, true, 0x43, false, true, false)]
+#[case::e_nc_c_h(0x8B, 0xF3, 0x1F, R8::E, false, 0x12, true, true, false)]
+#[case::e_c_c_h(0x8B, 0xF3, 0x1F, R8::E, true, 0x13, true, true, false)]
+#[case::e_zero(0x8B, 0xFE, 0x01, R8::E, true, 0x00, true, true, true)]
+#[case::h_nc_nc_nh(0x8C, 0x23, 0x12, R8::H, false, 0x35, false, false, false)]
+#[case::h_c_nc_nh(0x8C, 0x23, 0x12, R8::H, true, 0x36, false, false, false)]
+#[case::h_nc_c_nh(0x8C, 0xF3, 0x12, R8::H, false, 0x05, true, false, false)]
+#[case::h_c_c_nh(0x8C, 0xF3, 0x12, R8::H, true, 0x06, true, false, false)]
+#[case::h_nc_nc_h(0x8C, 0x23, 0x1F, R8::H, false, 0x42, false, true, false)]
+#[case::h_c_nc_h(0x8C, 0x23, 0x1F, R8::H, true, 0x43, false, true, false)]
+#[case::h_nc_c_h(0x8C, 0xF3, 0x1F, R8::H, false, 0x12, true, true, false)]
+#[case::h_c_c_h(0x8C, 0xF3, 0x1F, R8::H, true, 0x13, true, true, false)]
+#[case::h_zero(0x8C, 0xFE, 0x01, R8::H, true, 0x00, true, true, true)]
+#[case::l_nc_nc_nh(0x8D, 0x23, 0x12, R8::L, false, 0x35, false, false, false)]
+#[case::l_c_nc_nh(0x8D, 0x23, 0x12, R8::L, true, 0x36, false, false, false)]
+#[case::l_nc_c_nh(0x8D, 0xF3, 0x12, R8::L, false, 0x05, true, false, false)]
+#[case::l_c_c_nh(0x8D, 0xF3, 0x12, R8::L, true, 0x06, true, false, false)]
+#[case::l_nc_nc_h(0x8D, 0x23, 0x1F, R8::L, false, 0x42, false, true, false)]
+#[case::l_c_nc_h(0x8D, 0x23, 0x1F, R8::L, true, 0x43, false, true, false)]
+#[case::l_nc_c_h(0x8D, 0xF3, 0x1F, R8::L, false, 0x12, true, true, false)]
+#[case::l_c_c_h(0x8D, 0xF3, 0x1F, R8::L, true, 0x13, true, true, false)]
+#[case::l_zero(0x8D, 0xFE, 0x01, R8::L, true, 0x00, true, true, true)]
+#[case::hl_nc_nc_nh(0x8E, 0x23, 0x12, R8::HL, false, 0x35, false, false, false)]
+#[case::hl_c_nc_nh(0x8E, 0x23, 0x12, R8::HL, true, 0x36, false, false, false)]
+#[case::hl_nc_c_nh(0x8E, 0xF3, 0x12, R8::HL, false, 0x05, true, false, false)]
+#[case::hl_c_c_nh(0x8E, 0xF3, 0x12, R8::HL, true, 0x06, true, false, false)]
+#[case::hl_nc_nc_h(0x8E, 0x23, 0x1F, R8::HL, false, 0x42, false, true, false)]
+#[case::hl_c_nc_h(0x8E, 0x23, 0x1F, R8::HL, true, 0x43, false, true, false)]
+#[case::hl_nc_c_h(0x8E, 0xF3, 0x1F, R8::HL, false, 0x12, true, true, false)]
+#[case::hl_c_c_h(0x8E, 0xF3, 0x1F, R8::HL, true, 0x13, true, true, false)]
+#[case::hl_zero(0x8E, 0xFE, 0x01, R8::HL, true, 0x00, true, true, true)]
+#[case::a_nc_nc_nh(0x8F, 0x12, 0x12, R8::A, false, 0x24, false, false, false)]
+#[case::a_c_nc_nh(0x8F, 0x12, 0x12, R8::A, true, 0x25, false, false, false)]
+#[case::a_nc_c_nh(0x8F, 0x92, 0x92, R8::A, false, 0x24, true, false, false)]
+#[case::a_c_c_nh(0x8F, 0x92, 0x92, R8::A, true, 0x25, true, false, false)]
+#[case::a_nc_nc_h(0x8F, 0x19, 0x19, R8::A, false, 0x32, false, true, false)]
+#[case::a_c_nc_h(0x8F, 0x19, 0x19, R8::A, true, 0x33, false, true, false)]
+#[case::a_nc_c_h(0x8F, 0x88, 0x88, R8::A, false, 0x10, true, true, false)]
+#[case::a_c_c_h(0x8F, 0x88, 0x88, R8::A, true, 0x11, true, true, false)]
+#[case::a_zero(0x8F, 0x80, 0x80, R8::A, false, 0x00, true, false, true)]
+fn test_adc_r8(
+    #[case] opcode: u8,
+    #[case] value_a: u8,
+    #[case] value_r: u8,
+    #[case] register: R8,
+    #[case] carry: bool,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+    #[case] expected_half_carry: bool,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, opcode).write(0xCCCC, value_r).build();
+    let mut cpu = CPU::builder()
+        .a(value_a)
+        .hl(0xCCCC)
+        .f_carry(carry)
+        .r8(register, value_r, &mut mmu)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    if register == R8::HL {
+        assert_eq!(m, 2);
+    } else {
+        assert_eq!(m, 1);
+    }
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(!cpu.get_f_subtract());
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert_eq!(cpu.get_f_half_carry(), expected_half_carry);
+    assert_eq!(cpu.get_f_zero(), expected_zero);
 }
 
 /// ADD HL r16
@@ -717,7 +824,11 @@ fn test_ld_r8_r8(#[case] opcode: u8, #[case] target_reg: R8, #[case] source_reg:
         .build();
     let m = cpu.step(&mut mmu);
 
-    assert_eq!(m, 1);
+    if target_reg == R8::HL || source_reg == R8::HL {
+        assert_eq!(m, 2);
+    } else {
+        assert_eq!(m, 1);
+    }
     assert_eq!(cpu.get_pc(), 1);
     assert_eq!(cpu.get_r8(target_reg, &mmu), 0xCC);
 }

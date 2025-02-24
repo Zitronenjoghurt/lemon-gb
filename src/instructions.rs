@@ -8,6 +8,8 @@ pub enum Instruction {
     AddHLR16(R16),
     /// Add the specified register to register A
     AddR8(R8),
+    /// Add the specified register WITH the current carry to register A
+    AddCarryR8(R8),
     /// Complement register A => bitwise NOT
     ComplementA,
     /// Negates the carry flag
@@ -250,6 +252,14 @@ impl Instruction {
             0b1000_0101 => Ok(Instruction::AddR8(R8::L)),          // 0x85
             0b1000_0110 => Ok(Instruction::AddR8(R8::HL)),         // 0x86
             0b1000_0111 => Ok(Instruction::AddR8(R8::A)),          // 0x87
+            0b1000_1000 => Ok(Instruction::AddCarryR8(R8::B)),     // 0x88
+            0b1000_1001 => Ok(Instruction::AddCarryR8(R8::C)),     // 0x89
+            0b1000_1010 => Ok(Instruction::AddCarryR8(R8::D)),     // 0x8A
+            0b1000_1011 => Ok(Instruction::AddCarryR8(R8::E)),     // 0x8B
+            0b1000_1100 => Ok(Instruction::AddCarryR8(R8::H)),     // 0x8C
+            0b1000_1101 => Ok(Instruction::AddCarryR8(R8::L)),     // 0x8D
+            0b1000_1110 => Ok(Instruction::AddCarryR8(R8::HL)),    // 0x8E
+            0b1000_1111 => Ok(Instruction::AddCarryR8(R8::A)),     // 0x8F
             0b1100_0000 => Ok(Instruction::ReturnCondition(JumpCondition::NotZero)), // 0xC0
             0b1100_0001 => Ok(Instruction::PopR16(R16Stack::BC)),  // 0xC1
             0b1100_0010 => Ok(Instruction::JpCondImm16(JumpCondition::NotZero)), // 0xC2
@@ -310,7 +320,8 @@ impl Instruction {
             | Self::ReturnCondition(_)
             | Self::ReturnEnableInterrupts
             | Self::Halt
-            | Self::LoadR8R8(_) => 1,
+            | Self::LoadR8R8(_)
+            | Self::AddCarryR8(_) => 1,
             Self::LoadR8Imm8(_) | Self::JrImm8 | Self::JrCondImm8(_) => 2,
             Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
@@ -358,6 +369,7 @@ impl Instruction {
             Self::Nop => "NOP".into(),
             Self::AddHLR16(r16) => format!("ADD HL, {r16}"),
             Self::AddR8(r8) => format!("ADD A, {r8}"),
+            Self::AddCarryR8(r8) => format!("ADC A, {r8}"),
             Self::ComplementA => "CPL".into(),
             Self::ComplementCarryFlag => "CCF".into(),
             Self::DAA => "DAA".into(),
@@ -398,6 +410,9 @@ impl Instruction {
             Self::Nop => "No Operation".into(),
             Self::AddHLR16(r16) => format!("Add value from register {r16} to register HL"),
             Self::AddR8(r8) => format!("Add value from register {r8} to register A"),
+            Self::AddCarryR8(r8) => {
+                format!("Add value from register {r8} (and the current carry) to register A")
+            }
             Self::ComplementA => "Negate register A bitwise".into(),
             Self::ComplementCarryFlag => "Complement the carry flag in the F register".into(),
             Self::DAA => "Decimal adjust value in register A to be valid BCD".into(),

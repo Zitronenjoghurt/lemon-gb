@@ -46,6 +46,7 @@ impl CPU {
         match instruction {
             Instruction::AddHLR16(r16) => self.add_hl_r16(r16),
             Instruction::AddR8(r8) => self.add_r8(r8, mmu),
+            Instruction::AddCarryR8(r8) => self.add_carry_r8(r8, mmu),
             Instruction::ComplementA => self.complement_a(),
             Instruction::ComplementCarryFlag => self.complement_carry(),
             Instruction::DAA => self.decimal_adjust_accumulator(),
@@ -175,7 +176,7 @@ impl CPU {
 impl CPU {
     pub fn add_r8(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
         let source_value = self.get_r8(r8, mmu);
-        let (new_value, half_carry, carry) = add_carry_u8(self.get_a(), source_value);
+        let (new_value, half_carry, carry) = add_u8(self.get_a(), source_value);
 
         self.set_a(new_value);
         self.set_f_zero(new_value == 0);
@@ -183,13 +184,28 @@ impl CPU {
         self.set_f_half_carry(half_carry);
         self.set_f_carry(carry);
 
-        let m = if r8 == R8::HL { 3 } else { 2 };
+        let m = if r8 == R8::HL { 2 } else { 1 };
+        self.instruction_result(1, m)
+    }
+
+    pub fn add_carry_r8(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.get_r8(r8, mmu);
+        let (new_value, half_carry, carry) =
+            add_carry_u8(self.get_a(), source_value, self.get_f_carry());
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        let m = if r8 == R8::HL { 2 } else { 1 };
         self.instruction_result(1, m)
     }
 
     pub fn add_hl_r16(&mut self, r16: R16) -> (u16, u8) {
         let source_value = self.get_r16(r16);
-        let (new_value, half_carry, carry) = add_carry_u16(self.get_hl(), source_value);
+        let (new_value, half_carry, carry) = add_u16(self.get_hl(), source_value);
 
         self.set_hl(new_value);
         self.set_f_subtract(false);
@@ -323,7 +339,13 @@ impl CPU {
 
         let value = self.get_r8(source_r8, mmu);
         self.set_r8(target_r8, value, mmu);
-        self.instruction_result(1, 1)
+
+        let m = if target_r8 == R8::HL || source_r8 == R8::HL {
+            2
+        } else {
+            1
+        };
+        self.instruction_result(1, m)
     }
 
     pub fn load_imm16_sp(&mut self, mmu: &mut MMU) -> (u16, u8) {
