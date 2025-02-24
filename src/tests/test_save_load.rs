@@ -1,12 +1,12 @@
 use crate::game_boy::components::cartridge::Cartridge;
 use crate::game_boy::save_state::GameBoySaveState;
 use crate::game_boy::GameBoy;
-use std::fs::create_dir;
+use crate::tests::setup_test_dir;
 use std::path::PathBuf;
 
 #[test]
 fn test_save_load() {
-    create_dir(PathBuf::from("./test")).unwrap();
+    setup_test_dir();
 
     let test_rom_path = PathBuf::from("./test_roms/01-special.gb");
     let save_path_json = PathBuf::from("./test/test.json");
