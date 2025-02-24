@@ -216,7 +216,7 @@ impl MMU {
     }
 
     /// Fetches an interrupt by the provided priority and resets the IF flag
-    pub fn get_interrupt(&mut self) -> Option<Interrupt> {
+    pub fn get_interrupt(&self) -> Option<Interrupt> {
         let i_enable = self.get_ie_register();
         let i_flag = self.read(IF_ADDRESS);
         Interrupt::from_ie_if(i_enable & i_flag)

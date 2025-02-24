@@ -1,4 +1,6 @@
+use crate::enums::parameter_groups::R8;
 use crate::game_boy::components::cpu::registers::{CPURegisters, CpuRegistersAccessTrait};
+use crate::game_boy::components::mmu::MMU;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct CPURegistersBuilder {
@@ -98,6 +100,11 @@ pub trait CPURegistersBuilderTrait: CpuRegistersAccessTrait + Sized {
 
     fn hl(mut self, value: u16) -> Self {
         self.get_registers_mut().set_hl(value);
+        self
+    }
+
+    fn r8(mut self, r8: R8, value: u8, mmu: &mut MMU) -> Self {
+        self.set_r8(r8, value, mmu);
         self
     }
 }

@@ -51,4 +51,14 @@ impl Interrupt {
             Interrupt::Joypad => 0x60,
         }
     }
+
+    pub fn get_mask(&self) -> u8 {
+        match self {
+            Interrupt::Vblank => 0b0000_0001,
+            Interrupt::Lcd => 0b0000_0010,
+            Interrupt::Timer => 0b0000_0100,
+            Interrupt::Serial => 0b0000_1000,
+            Interrupt::Joypad => 0b0001_0000,
+        }
+    }
 }

@@ -1,3 +1,4 @@
+use crate::enums::parameter_groups::R8;
 use crate::game_boy::components::cpu::registers::builder::CPURegistersBuilderTrait;
 use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
 use crate::game_boy::components::cpu::CPU;
@@ -640,6 +641,85 @@ fn test_ld_hl_imm8() {
     assert_eq!(m, 3);
     assert_eq!(cpu.get_pc(), 2);
     assert_eq!(mmu.read(ADDRESS), VALUE);
+}
+
+/// LOAD r8 r8
+#[rstest]
+#[case::b_b(0x40, R8::B, R8::B)]
+#[case::b_c(0x41, R8::B, R8::C)]
+#[case::b_d(0x42, R8::B, R8::D)]
+#[case::b_e(0x43, R8::B, R8::E)]
+#[case::b_h(0x44, R8::B, R8::H)]
+#[case::b_l(0x45, R8::B, R8::L)]
+#[case::b_hl(0x46, R8::B, R8::HL)]
+#[case::b_a(0x47, R8::B, R8::A)]
+#[case::c_b(0x48, R8::C, R8::B)]
+#[case::c_c(0x49, R8::C, R8::C)]
+#[case::c_d(0x4A, R8::C, R8::D)]
+#[case::c_e(0x4B, R8::C, R8::E)]
+#[case::c_h(0x4C, R8::C, R8::H)]
+#[case::c_l(0x4D, R8::C, R8::L)]
+#[case::c_hl(0x4E, R8::C, R8::HL)]
+#[case::c_a(0x4F, R8::C, R8::A)]
+#[case::d_b(0x50, R8::D, R8::B)]
+#[case::d_c(0x51, R8::D, R8::C)]
+#[case::d_d(0x52, R8::D, R8::D)]
+#[case::d_e(0x53, R8::D, R8::E)]
+#[case::d_h(0x54, R8::D, R8::H)]
+#[case::d_l(0x55, R8::D, R8::L)]
+#[case::d_hl(0x56, R8::D, R8::HL)]
+#[case::d_a(0x57, R8::D, R8::A)]
+#[case::e_b(0x58, R8::E, R8::B)]
+#[case::e_c(0x59, R8::E, R8::C)]
+#[case::e_d(0x5A, R8::E, R8::D)]
+#[case::e_e(0x5B, R8::E, R8::E)]
+#[case::e_h(0x5C, R8::E, R8::H)]
+#[case::e_l(0x5D, R8::E, R8::L)]
+#[case::e_hl(0x5E, R8::E, R8::HL)]
+#[case::e_a(0x5F, R8::E, R8::A)]
+#[case::h_b(0x60, R8::H, R8::B)]
+#[case::h_c(0x61, R8::H, R8::C)]
+#[case::h_d(0x62, R8::H, R8::D)]
+#[case::h_e(0x63, R8::H, R8::E)]
+#[case::h_h(0x64, R8::H, R8::H)]
+#[case::h_l(0x65, R8::H, R8::L)]
+#[case::h_hl(0x66, R8::H, R8::HL)]
+#[case::h_a(0x67, R8::H, R8::A)]
+#[case::l_b(0x68, R8::L, R8::B)]
+#[case::l_c(0x69, R8::L, R8::C)]
+#[case::l_d(0x6A, R8::L, R8::D)]
+#[case::l_e(0x6B, R8::L, R8::E)]
+#[case::l_h(0x6C, R8::L, R8::H)]
+#[case::l_l(0x6D, R8::L, R8::L)]
+#[case::l_hl(0x6E, R8::L, R8::HL)]
+#[case::l_a(0x6F, R8::L, R8::A)]
+#[case::hl_b(0x70, R8::HL, R8::B)]
+#[case::hl_c(0x71, R8::HL, R8::C)]
+#[case::hl_d(0x72, R8::HL, R8::D)]
+#[case::hl_e(0x73, R8::HL, R8::E)]
+#[case::hl_h(0x74, R8::HL, R8::H)]
+#[case::hl_l(0x75, R8::HL, R8::L)]
+// LD HL HL = HALT
+#[case::hl_a(0x77, R8::HL, R8::A)]
+#[case::a_b(0x78, R8::A, R8::B)]
+#[case::a_c(0x79, R8::A, R8::C)]
+#[case::a_d(0x7A, R8::A, R8::D)]
+#[case::a_e(0x7B, R8::A, R8::E)]
+#[case::a_h(0x7C, R8::A, R8::H)]
+#[case::a_l(0x7D, R8::A, R8::L)]
+#[case::a_hl(0x7E, R8::A, R8::HL)]
+#[case::a_a(0x7F, R8::A, R8::A)]
+fn test_ld_r8_r8(#[case] opcode: u8, #[case] target_reg: R8, #[case] source_reg: R8) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::builder()
+        .hl(0xCCCC)
+        .r8(source_reg, 0xCC, &mut mmu)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 1);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_r8(target_reg, &mmu), 0xCC);
 }
 
 /// LOAD r16 imm16

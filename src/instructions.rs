@@ -23,6 +23,8 @@ pub enum Instruction {
     DisableInterrupts,
     /// Enables interrupts after the next instruction
     EnableInterrupts,
+    /// Enter CPU low-power consumption mode until an interrupt occurs (with some interesting behavior though)
+    Halt,
     /// Increment the specified register
     IncR8(R8),
     /// Increment the specified register
@@ -49,6 +51,8 @@ pub enum Instruction {
     LoadR16Imm16(R16),
     /// Loads the following byte into the specified register
     LoadR8Imm8(R8),
+    /// Load the value from the register on the right into the register on the left
+    LoadR8R8((R8, R8)),
     /// Load the value at the top of the stack into the address specified by the following 2 bytes
     LoadImm16SP,
     /// Does nothing, will stall a cycle
@@ -174,6 +178,70 @@ impl Instruction {
             0b0011_1101 => Ok(Instruction::DecR8(R8::A)),          // 0x3D
             0b0011_1110 => Ok(Instruction::LoadR8Imm8(R8::A)),     // 0x3E
             0b0011_1111 => Ok(Instruction::ComplementCarryFlag),   // 0x3F
+            0b0100_0000 => Ok(Instruction::LoadR8R8((R8::B, R8::B))), // 0x40
+            0b0100_0001 => Ok(Instruction::LoadR8R8((R8::B, R8::C))), // 0x41
+            0b0100_0010 => Ok(Instruction::LoadR8R8((R8::B, R8::D))), // 0x42
+            0b0100_0011 => Ok(Instruction::LoadR8R8((R8::B, R8::E))), // 0x43
+            0b0100_0100 => Ok(Instruction::LoadR8R8((R8::B, R8::H))), // 0x44
+            0b0100_0101 => Ok(Instruction::LoadR8R8((R8::B, R8::L))), // 0x45
+            0b0100_0110 => Ok(Instruction::LoadR8R8((R8::B, R8::HL))), // 0x46
+            0b0100_0111 => Ok(Instruction::LoadR8R8((R8::B, R8::A))), // 0x47
+            0b0100_1000 => Ok(Instruction::LoadR8R8((R8::C, R8::B))), // 0x48
+            0b0100_1001 => Ok(Instruction::LoadR8R8((R8::C, R8::C))), // 0x49
+            0b0100_1010 => Ok(Instruction::LoadR8R8((R8::C, R8::D))), // 0x4A
+            0b0100_1011 => Ok(Instruction::LoadR8R8((R8::C, R8::E))), // 0x4B
+            0b0100_1100 => Ok(Instruction::LoadR8R8((R8::C, R8::H))), // 0x4C
+            0b0100_1101 => Ok(Instruction::LoadR8R8((R8::C, R8::L))), // 0x4D
+            0b0100_1110 => Ok(Instruction::LoadR8R8((R8::C, R8::HL))), // 0x4E
+            0b0100_1111 => Ok(Instruction::LoadR8R8((R8::C, R8::A))), // 0x4F
+            0b0101_0000 => Ok(Instruction::LoadR8R8((R8::D, R8::B))), // 0x50
+            0b0101_0001 => Ok(Instruction::LoadR8R8((R8::D, R8::C))), // 0x51
+            0b0101_0010 => Ok(Instruction::LoadR8R8((R8::D, R8::D))), // 0x52
+            0b0101_0011 => Ok(Instruction::LoadR8R8((R8::D, R8::E))), // 0x53
+            0b0101_0100 => Ok(Instruction::LoadR8R8((R8::D, R8::H))), // 0x54
+            0b0101_0101 => Ok(Instruction::LoadR8R8((R8::D, R8::L))), // 0x55
+            0b0101_0110 => Ok(Instruction::LoadR8R8((R8::D, R8::HL))), // 0x56
+            0b0101_0111 => Ok(Instruction::LoadR8R8((R8::D, R8::A))), // 0x57
+            0b0101_1000 => Ok(Instruction::LoadR8R8((R8::E, R8::B))), // 0x58
+            0b0101_1001 => Ok(Instruction::LoadR8R8((R8::E, R8::C))), // 0x59
+            0b0101_1010 => Ok(Instruction::LoadR8R8((R8::E, R8::D))), // 0x5A
+            0b0101_1011 => Ok(Instruction::LoadR8R8((R8::E, R8::E))), // 0x5B
+            0b0101_1100 => Ok(Instruction::LoadR8R8((R8::E, R8::H))), // 0x5C
+            0b0101_1101 => Ok(Instruction::LoadR8R8((R8::E, R8::L))), // 0x5D
+            0b0101_1110 => Ok(Instruction::LoadR8R8((R8::E, R8::HL))), // 0x5E
+            0b0101_1111 => Ok(Instruction::LoadR8R8((R8::E, R8::A))), // 0x5F
+            0b0110_0000 => Ok(Instruction::LoadR8R8((R8::H, R8::B))), // 0x60
+            0b0110_0001 => Ok(Instruction::LoadR8R8((R8::H, R8::C))), // 0x61
+            0b0110_0010 => Ok(Instruction::LoadR8R8((R8::H, R8::D))), // 0x62
+            0b0110_0011 => Ok(Instruction::LoadR8R8((R8::H, R8::E))), // 0x63
+            0b0110_0100 => Ok(Instruction::LoadR8R8((R8::H, R8::H))), // 0x64
+            0b0110_0101 => Ok(Instruction::LoadR8R8((R8::H, R8::L))), // 0x65
+            0b0110_0110 => Ok(Instruction::LoadR8R8((R8::H, R8::HL))), // 0x66
+            0b0110_0111 => Ok(Instruction::LoadR8R8((R8::H, R8::A))), // 0x67
+            0b0110_1000 => Ok(Instruction::LoadR8R8((R8::L, R8::B))), // 0x68
+            0b0110_1001 => Ok(Instruction::LoadR8R8((R8::L, R8::C))), // 0x69
+            0b0110_1010 => Ok(Instruction::LoadR8R8((R8::L, R8::D))), // 0x6A
+            0b0110_1011 => Ok(Instruction::LoadR8R8((R8::L, R8::E))), // 0x6B
+            0b0110_1100 => Ok(Instruction::LoadR8R8((R8::L, R8::H))), // 0x6C
+            0b0110_1101 => Ok(Instruction::LoadR8R8((R8::L, R8::L))), // 0x6D
+            0b0110_1110 => Ok(Instruction::LoadR8R8((R8::L, R8::HL))), // 0x6E
+            0b0110_1111 => Ok(Instruction::LoadR8R8((R8::L, R8::A))), // 0x6F
+            0b0111_0000 => Ok(Instruction::LoadR8R8((R8::HL, R8::B))), // 0x70
+            0b0111_0001 => Ok(Instruction::LoadR8R8((R8::HL, R8::C))), // 0x71
+            0b0111_0010 => Ok(Instruction::LoadR8R8((R8::HL, R8::D))), // 0x72
+            0b0111_0011 => Ok(Instruction::LoadR8R8((R8::HL, R8::E))), // 0x73
+            0b0111_0100 => Ok(Instruction::LoadR8R8((R8::HL, R8::H))), // 0x74
+            0b0111_0101 => Ok(Instruction::LoadR8R8((R8::HL, R8::L))), // 0x75
+            0b0111_0110 => Ok(Instruction::Halt),                  // 0x76
+            0b0111_0111 => Ok(Instruction::LoadR8R8((R8::HL, R8::A))), // 0x77
+            0b0111_1000 => Ok(Instruction::LoadR8R8((R8::A, R8::B))), // 0x78
+            0b0111_1001 => Ok(Instruction::LoadR8R8((R8::A, R8::C))), // 0x79
+            0b0111_1010 => Ok(Instruction::LoadR8R8((R8::A, R8::D))), // 0x7A
+            0b0111_1011 => Ok(Instruction::LoadR8R8((R8::A, R8::E))), // 0x7B
+            0b0111_1100 => Ok(Instruction::LoadR8R8((R8::A, R8::H))), // 0x7C
+            0b0111_1101 => Ok(Instruction::LoadR8R8((R8::A, R8::L))), // 0x7D
+            0b0111_1110 => Ok(Instruction::LoadR8R8((R8::A, R8::HL))), // 0x7E
+            0b0111_1111 => Ok(Instruction::LoadR8R8((R8::A, R8::A))), // 0x7F
             0b1000_0000 => Ok(Instruction::AddR8(R8::B)),          // 0x80
             0b1000_0001 => Ok(Instruction::AddR8(R8::C)),          // 0x81
             0b1000_0010 => Ok(Instruction::AddR8(R8::D)),          // 0x82
@@ -240,7 +308,9 @@ impl Instruction {
             | Self::EnableInterrupts
             | Self::Return
             | Self::ReturnCondition(_)
-            | Self::ReturnEnableInterrupts => 1,
+            | Self::ReturnEnableInterrupts
+            | Self::Halt
+            | Self::LoadR8R8(_) => 1,
             Self::LoadR8Imm8(_) | Self::JrImm8 | Self::JrCondImm8(_) => 2,
             Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
@@ -295,6 +365,7 @@ impl Instruction {
             Self::DecR16(r16) => format!("DEC {r16}"),
             Self::DisableInterrupts => "DI".into(),
             Self::EnableInterrupts => "EI".into(),
+            Self::Halt => "HALT".into(),
             Self::IncR8(r8) => format!("INC {r8}"),
             Self::IncR16(r16) => format!("INC {r16}"),
             Self::JpHL => "JP HL".into(),
@@ -306,6 +377,7 @@ impl Instruction {
             Self::LoadR16A(r16_mem) => format!("LD {r16_mem}, A"),
             Self::LoadR16Imm16(r16) => format!("LD {r16}, 0x{:02X}{:02X}", msb, lsb),
             Self::LoadR8Imm8(r8) => format!("LD {r8}, 0x{:02X}", msb),
+            Self::LoadR8R8((target, source)) => format!("LD {target}, {source}"),
             Self::LoadImm16SP => format!("LD 0x{:02X}{:02X}, SP", msb, lsb),
             Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
             Self::PushR16(r16_stack) => format!("PUSH {r16_stack}"),
@@ -333,6 +405,7 @@ impl Instruction {
             Self::DecR16(r16) => format!("Decrement register {r16}"),
             Self::DisableInterrupts => "Disable interrupts".into(),
             Self::EnableInterrupts => "Enable interrupts after the next instruction".into(),
+            Self::Halt => "Halt".into(),
             Self::IncR8(r8) => format!("Increment register {r8}"),
             Self::IncR16(r16) => format!("Increment register {r16}"),
             Self::JpHL => "Jump to the address specified in register HL".into(),
@@ -379,6 +452,9 @@ impl Instruction {
             }
             Self::LoadR8Imm8(r8) => {
                 format!("Load 0x{:02X} into register {r8}", msb)
+            }
+            Self::LoadR8R8((target, source)) => {
+                format!("Load value in register {source} into register {target}")
             }
             Self::LoadImm16SP => {
                 format!(

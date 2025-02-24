@@ -23,6 +23,10 @@ pub struct CPU {
     ime: bool,
     /// True if the IME is to be set after handling the current instruction
     deferred_set_ime: bool,
+    /// If the CPU is in low power mode
+    eeping: bool,
+    /// This is true when the program counter should not be incremented
+    halting_bug_active: bool,
 }
 
 impl CPU {
@@ -49,6 +53,7 @@ impl CPU {
             Instruction::DecR16(r16) => self.decrement_r16(r16),
             Instruction::DisableInterrupts => self.disable_interrupts(),
             Instruction::EnableInterrupts => self.enable_interrupts(),
+            Instruction::Halt | Instruction::LoadR8R8((R8::HL, R8::HL)) => self.halt(),
             Instruction::IncR8(r8) => self.increment_r8(r8, mmu),
             Instruction::IncR16(r16) => self.increment_r16(r16),
             Instruction::JpHL => self.jump_hl(),
@@ -60,6 +65,9 @@ impl CPU {
             Instruction::LoadR16A(r16_mem) => self.load_r16m_a(r16_mem, mmu),
             Instruction::LoadR16Imm16(r16) => self.load_r16_imm(r16, mmu),
             Instruction::LoadR8Imm8(r8) => self.load_r8_imm8(r8, mmu),
+            Instruction::LoadR8R8((target_r8, source_r8)) => {
+                self.load_r8_r8(target_r8, source_r8, mmu)
+            }
             Instruction::LoadImm16SP => self.load_imm16_sp(mmu),
             Instruction::Nop => self.instruction_result(1, 1),
             Instruction::PopR16(r16_stack) => self.pop_r16(r16_stack, mmu),
@@ -81,7 +89,14 @@ impl CPU {
 
         let has_interrupt = self.ime && self.handle_interrupts(mmu);
         if has_interrupt {
+            self.eeping = false;
             return 5; // The interrupt handling takes 5 m-cycles
+        }
+
+        if self.eeping && !self.ime && self.is_interrupt_pending(mmu) {
+            self.eeping = false;
+        } else if self.eeping {
+            return 1; // Just stall a cycle
         }
 
         let mut instruction_byte = mmu.read(self.get_pc());
@@ -91,10 +106,20 @@ impl CPU {
         }
 
         let instruction = Instruction::from_byte(instruction_byte, prefixed).unwrap();
+        if self.should_trigger_halting_bug(&instruction, mmu) {
+            self.set_pc(self.get_pc().wrapping_add(1));
+            self.halting_bug_active = true;
+            return self.step(mmu);
+        }
+
         self.log_instruction_execute(&instruction, instruction_byte, mmu);
 
         let (next_pc, m_cycles) = self.execute(instruction, mmu);
-        self.set_pc(next_pc);
+        if self.halting_bug_active {
+            self.halting_bug_active = false;
+        } else {
+            self.set_pc(next_pc);
+        }
 
         if initial_deferred_set_ime && self.deferred_set_ime {
             self.deferred_set_ime = false;
@@ -102,6 +127,20 @@ impl CPU {
         }
 
         m_cycles
+    }
+
+    fn is_interrupt_pending(&self, mmu: &MMU) -> bool {
+        mmu.get_interrupt().is_some()
+    }
+
+    /// https://gbdev.io/pandocs/halt.html#halt
+    fn should_trigger_halting_bug(&self, instruction: &Instruction, mmu: &MMU) -> bool {
+        !self.ime
+            && self.is_interrupt_pending(mmu)
+            && matches!(
+                instruction,
+                Instruction::Halt | Instruction::LoadR8R8((R8::HL, R8::HL))
+            )
     }
 
     fn handle_interrupts(&mut self, mmu: &mut MMU) -> bool {
@@ -229,6 +268,11 @@ impl CPU {
         self.instruction_result(1, 1)
     }
 
+    pub fn halt(&mut self) -> (u16, u8) {
+        self.eeping = true;
+        self.instruction_result(1, 1)
+    }
+
     pub fn increment_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
         self.set_r8(r8, self.get_r8(r8, mmu).wrapping_add(1), mmu);
         let m = if r8 == R8::HL { 3 } else { 1 };
@@ -270,6 +314,16 @@ impl CPU {
 
         let m = if r8 == R8::HL { 3 } else { 2 };
         self.instruction_result(2, m)
+    }
+
+    pub fn load_r8_r8(&mut self, target_r8: R8, source_r8: R8, mmu: &mut MMU) -> (u16, u8) {
+        if target_r8 == R8::HL && source_r8 == R8::HL {
+            return self.halt();
+        }
+
+        let value = self.get_r8(source_r8, mmu);
+        self.set_r8(target_r8, value, mmu);
+        self.instruction_result(1, 1)
     }
 
     pub fn load_imm16_sp(&mut self, mmu: &mut MMU) -> (u16, u8) {
