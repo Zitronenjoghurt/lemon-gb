@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 const ZERO_FLAG: u8 = 0b1000_0000;
 const SUBTRACT_FLAG: u8 = 0b0100_0000;
 const HALF_CARRY_FLAG: u8 = 0b0010_0000;
@@ -10,7 +12,7 @@ const INITIAL_N: bool = false;
 const INITIAL_H: bool = false;
 const INITIAL_C: bool = false;
 
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CPUFlagsRegister {
     /// Set to true if the result of the operation is equal to 0
     zero: bool,

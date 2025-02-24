@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 
 /// This will tell the MMU how to behave during memory access
@@ -43,7 +44,7 @@ impl From<CartridgeType> for MbcType {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CartridgeType {
     #[default]
     RomOnly = 0x00,
@@ -119,7 +120,7 @@ impl TryFrom<u8> for CartridgeType {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CartridgeCGBFlag {
     #[default]
     None,
@@ -137,7 +138,7 @@ impl From<u8> for CartridgeCGBFlag {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CartridgeDestinationCode {
     #[default]
     None = 0xFF,

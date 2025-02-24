@@ -3,6 +3,7 @@ use crate::game_boy::components::cpu::registers::builder::CPURegistersBuilder;
 use crate::game_boy::components::cpu::registers::flags_register::CPUFlagsRegister;
 use crate::game_boy::components::mmu::MMU;
 use crate::helpers::bit_operations::{construct_u16, deconstruct_u16};
+use serde::{Deserialize, Serialize};
 
 pub mod builder;
 pub mod flags_register;
@@ -19,7 +20,7 @@ const INITIAL_L: u8 = 0x03;
 const INITIAL_PC: u16 = 0x0100;
 const INITIAL_SP: u16 = 0xFFFE;
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CPURegisters {
     a: u8,
     b: u8,

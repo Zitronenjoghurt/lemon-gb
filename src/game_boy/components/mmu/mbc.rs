@@ -1,9 +1,10 @@
 use crate::game_boy::components::cartridge::types::MbcType;
 use crate::game_boy::components::mmu::mbc::mbc1::Mbc1;
+use serde::{Deserialize, Serialize};
 
 pub mod mbc1;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Mbc {
     None,
     Mbc1(Mbc1),

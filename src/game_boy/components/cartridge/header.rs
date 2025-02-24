@@ -3,6 +3,7 @@ use crate::game_boy::components::cartridge::types::{
 };
 use crate::helpers::bit_operations::construct_u16;
 use crate::instructions::Instruction;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::Debug;
 
@@ -12,7 +13,7 @@ const NINTENDO_LOGO: [u8; 48] = [
     0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
 ];
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CartridgeHeader {
     /// The first 2-4 instructions of the ROM, usually that's where they jump to the actual ROM entry point
     pub entry_point: Vec<String>,

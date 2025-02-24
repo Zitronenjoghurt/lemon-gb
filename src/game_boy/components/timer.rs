@@ -1,11 +1,13 @@
 //! https://hacktix.github.io/GBEDG/timers/
+
 use crate::game_boy::components::mmu::{
     DIV_ADDRESS, INITIAL_DIV, MMU, TAC_ADDRESS, TIMA_ADDRESS, TMA_ADDRESS,
 };
 use crate::helpers::bit_operations::{get_bit_u16, get_bit_u8};
+use serde::{Deserialize, Serialize};
 
 // ToDo: Maybe add more accurate TIMA overflow timing, its 0 for 1 M-Cycle before getting reset to TMA and triggering the interrupt
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Timer {
     pub counter: u16,
     last_and_result: bool,

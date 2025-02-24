@@ -3,10 +3,13 @@ use crate::game_boy::components::cartridge::header::CartridgeHeader;
 use crate::game_boy::components::cartridge::Cartridge;
 use crate::game_boy::components::mmu::builder::MMUBuilder;
 use crate::game_boy::components::mmu::mbc::Mbc;
+use crate::game_boy::components::mmu::save_state::MMUSaveState;
 use crate::helpers::bit_operations::construct_u16;
+use std::error::Error;
 
 mod builder;
 pub mod mbc;
+pub mod save_state;
 
 pub const ROM_BANK_SIZE: usize = 0x4000; // 16KB
 const RAM_BANK_SIZE: usize = 0x2000; // 8KB
@@ -69,7 +72,7 @@ pub const IE_ADDRESS: u16 = 0xFFFF;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MMU {
-    cartridge_header: CartridgeHeader,
+    pub cartridge_header: CartridgeHeader,
 
     mbc: Mbc,
     rom_banks: Vec<[u8; ROM_BANK_SIZE]>,
@@ -217,6 +220,43 @@ impl MMU {
         let i_enable = self.get_ie_register();
         let i_flag = self.read(IF_ADDRESS);
         Interrupt::from_ie_if(i_enable & i_flag)
+    }
+
+    pub fn save(&self) -> MMUSaveState {
+        MMUSaveState {
+            mbc: self.mbc.clone(),
+            ram: self.ram_banks.iter().map(|bank| bank.to_vec()).collect(),
+            vram: self.vram.to_vec(),
+            wram: self.wram.to_vec(),
+            oam: self.oam.to_vec(),
+            io_registers: self.io_registers.to_vec(),
+            hram: self.hram.to_vec(),
+            ie_register: self.ie_register,
+        }
+    }
+
+    pub fn load(state: MMUSaveState, cartridge: &Cartridge) -> Result<Self, Box<dyn Error>> {
+        let ram_banks = state
+            .ram
+            .into_iter()
+            .map(|bank| bank.try_into().map_err(|_| "Failed to load RAM banks"))
+            .collect::<Result<Vec<[u8; RAM_BANK_SIZE]>, &str>>()?;
+
+        Ok(Self {
+            cartridge_header: cartridge.header.clone(),
+            mbc: state.mbc,
+            rom_banks: cartridge.rom_banks.clone(),
+            ram_banks,
+            vram: state.vram.try_into().map_err(|_| "Failed to load VRAM")?,
+            wram: state.wram.try_into().map_err(|_| "Failed to load WRAM")?,
+            oam: state.oam.try_into().map_err(|_| "Failed to load OAM")?,
+            io_registers: state
+                .io_registers
+                .try_into()
+                .map_err(|_| "Failed to load IO registers")?,
+            hram: state.hram.try_into().map_err(|_| "Failed to load HRAM")?,
+            ie_register: state.ie_register,
+        })
     }
 }
 

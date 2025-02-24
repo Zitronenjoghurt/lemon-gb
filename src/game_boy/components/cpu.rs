@@ -5,7 +5,9 @@ use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
 use crate::game_boy::components::mmu::{IF_ADDRESS, MMU};
 use crate::helpers::bit_operations::*;
 use crate::instructions::Instruction;
+use log::info;
 use registers::CPURegisters;
+use serde::{Deserialize, Serialize};
 
 mod builder;
 pub mod registers;
@@ -13,7 +15,7 @@ pub mod registers;
 /// This tells the CPU that the next instruction to be executed is a prefixed instruction
 pub const PREFIX_INSTRUCTION_BYTE: u8 = 0xCB;
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CPU {
     registers: CPURegisters,
     /// Interrupt Master Enable Flag
@@ -89,6 +91,8 @@ impl CPU {
         }
 
         let instruction = Instruction::from_byte(instruction_byte, prefixed).unwrap();
+        self.log_instruction_execute(&instruction, instruction_byte, mmu);
+
         let (next_pc, m_cycles) = self.execute(instruction, mmu);
         self.set_pc(next_pc);
 
@@ -431,6 +435,21 @@ impl CPU {
         self.set_f_zero(false);
         self.set_f_subtract(false);
         self.set_f_half_carry(false);
+    }
+}
+
+/// Logging
+impl CPU {
+    fn log_instruction_execute(&self, instruction: &Instruction, instruction_byte: u8, mmu: &MMU) {
+        if log::log_enabled!(log::Level::Info) {
+            let (next_lsb, next_msb) = deconstruct_u16(self.read_next_imm16(mmu));
+            info!(
+                "PC(0x{:04X}) [0x{:02X}]: {}",
+                self.get_pc(),
+                instruction_byte,
+                instruction.parse_description(next_lsb, next_msb)
+            );
+        }
     }
 }
 

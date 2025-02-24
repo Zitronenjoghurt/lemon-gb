@@ -1,4 +1,6 @@
 use crate::game_boy::components::cartridge::Cartridge;
+use crate::game_boy::GameBoy;
+use log::LevelFilter;
 use std::path::PathBuf;
 
 pub mod enums;
@@ -9,7 +11,22 @@ pub mod instructions;
 mod tests;
 
 fn main() {
-    let path = PathBuf::from("./roms/Pokemon Blue.gb");
+    env_logger::Builder::new()
+        .filter_level(LevelFilter::Debug)
+        .init();
+
+    let path = PathBuf::from("./roms/Super Mario Land.gb");
     let cartridge = Cartridge::load(path).unwrap();
-    println!("{:#?}", cartridge.header);
+
+    let mut game_boy = GameBoy::initialize(&cartridge);
+    game_boy.step();
+    game_boy.step();
+    game_boy.step();
+    game_boy.step();
+    game_boy.step();
+
+    let state = game_boy.save();
+    state
+        .store_binary(&PathBuf::from("./test/test.bin"))
+        .unwrap();
 }

@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 // ToDo: Check if lower bit masking depending on ROM size is necessary
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Mbc1 {
     bank1: u8,
     bank2: u8,
