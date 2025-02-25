@@ -10,6 +10,11 @@ pub enum Instruction {
     AddR8(R8),
     /// Add the specified register WITH the current carry to register A
     AddCarryR8(R8),
+    /// Register A will be set to the bitwise AND between the value register A and the value in the specified register
+    AndR8(R8),
+    /// Set flag according to a subtraction between value in register A and the specified register while discarding the result
+    /// This essentially sets the Carry if r8 > A
+    CompareR8(R8),
     /// Complement register A => bitwise NOT
     ComplementA,
     /// Negates the carry flag
@@ -60,6 +65,8 @@ pub enum Instruction {
     /// Does nothing, will stall a cycle
     #[default]
     Nop,
+    /// Register A will be set to the bitwise OR between the value register A and the value in the specified register
+    OrR8(R8),
     /// Pop 2 bytes from the stack to the specified register
     PopR16(R16Stack),
     /// Push 2 bytes from the specified register to the stack
@@ -108,6 +115,8 @@ pub enum Instruction {
     SubR8(R8),
     /// Subtract the value in the specified register AND the current carry from register A
     SubCarryR8(R8),
+    /// Register A will be set to the bitwise XOR between the value register A and the value in the specified register
+    XorR8(R8),
 }
 
 impl Instruction {
@@ -280,6 +289,38 @@ impl Instruction {
             0b1001_1101 => Ok(Instruction::SubCarryR8(R8::L)),     // 0x9D
             0b1001_1110 => Ok(Instruction::SubCarryR8(R8::HL)),    // 0x9E
             0b1001_1111 => Ok(Instruction::SubCarryR8(R8::A)),     // 0x9F
+            0b1010_0000 => Ok(Instruction::AndR8(R8::B)),          // 0xA0
+            0b1010_0001 => Ok(Instruction::AndR8(R8::C)),          // 0xA1
+            0b1010_0010 => Ok(Instruction::AndR8(R8::D)),          // 0xA2
+            0b1010_0011 => Ok(Instruction::AndR8(R8::E)),          // 0xA3
+            0b1010_0100 => Ok(Instruction::AndR8(R8::H)),          // 0xA4
+            0b1010_0101 => Ok(Instruction::AndR8(R8::L)),          // 0xA5
+            0b1010_0110 => Ok(Instruction::AndR8(R8::HL)),         // 0xA6
+            0b1010_0111 => Ok(Instruction::AndR8(R8::A)),          // 0xA7
+            0b1010_1000 => Ok(Instruction::XorR8(R8::B)),          // 0xA8
+            0b1010_1001 => Ok(Instruction::XorR8(R8::C)),          // 0xA9
+            0b1010_1010 => Ok(Instruction::XorR8(R8::D)),          // 0xAA
+            0b1010_1011 => Ok(Instruction::XorR8(R8::E)),          // 0xAB
+            0b1010_1100 => Ok(Instruction::XorR8(R8::H)),          // 0xAC
+            0b1010_1101 => Ok(Instruction::XorR8(R8::L)),          // 0xAD
+            0b1010_1110 => Ok(Instruction::XorR8(R8::HL)),         // 0xAE
+            0b1010_1111 => Ok(Instruction::XorR8(R8::A)),          // 0xAF
+            0b1011_0000 => Ok(Instruction::OrR8(R8::B)),           // 0xB0
+            0b1011_0001 => Ok(Instruction::OrR8(R8::C)),           // 0xB1
+            0b1011_0010 => Ok(Instruction::OrR8(R8::D)),           // 0xB2
+            0b1011_0011 => Ok(Instruction::OrR8(R8::E)),           // 0xB3
+            0b1011_0100 => Ok(Instruction::OrR8(R8::H)),           // 0xB4
+            0b1011_0101 => Ok(Instruction::OrR8(R8::L)),           // 0xB5
+            0b1011_0110 => Ok(Instruction::OrR8(R8::HL)),          // 0xB6
+            0b1011_0111 => Ok(Instruction::OrR8(R8::A)),           // 0xB7
+            0b1011_1000 => Ok(Instruction::CompareR8(R8::B)),      // 0xB8
+            0b1011_1001 => Ok(Instruction::CompareR8(R8::C)),      // 0xB9
+            0b1011_1010 => Ok(Instruction::CompareR8(R8::D)),      // 0xBA
+            0b1011_1011 => Ok(Instruction::CompareR8(R8::E)),      // 0xBB
+            0b1011_1100 => Ok(Instruction::CompareR8(R8::H)),      // 0xBC
+            0b1011_1101 => Ok(Instruction::CompareR8(R8::L)),      // 0xBD
+            0b1011_1110 => Ok(Instruction::CompareR8(R8::HL)),     // 0xBE
+            0b1011_1111 => Ok(Instruction::CompareR8(R8::A)),      // 0xBF
             0b1100_0000 => Ok(Instruction::ReturnCondition(JumpCondition::NotZero)), // 0xC0
             0b1100_0001 => Ok(Instruction::PopR16(R16Stack::BC)),  // 0xC1
             0b1100_0010 => Ok(Instruction::JpCondImm16(JumpCondition::NotZero)), // 0xC2
@@ -343,7 +384,11 @@ impl Instruction {
             | Self::LoadR8R8(_)
             | Self::AddCarryR8(_)
             | Self::SubR8(_)
-            | Self::SubCarryR8(_) => 1,
+            | Self::SubCarryR8(_)
+            | Self::AndR8(_)
+            | Self::XorR8(_)
+            | Self::OrR8(_)
+            | Self::CompareR8(_) => 1,
             Self::LoadR8Imm8(_) | Self::JrImm8 | Self::JrCondImm8(_) => 2,
             Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
@@ -392,6 +437,8 @@ impl Instruction {
             Self::AddHLR16(r16) => format!("ADD HL, {r16}"),
             Self::AddR8(r8) => format!("ADD A, {r8}"),
             Self::AddCarryR8(r8) => format!("ADC A, {r8}"),
+            Self::AndR8(r8) => format!("AND A, {r8}"),
+            Self::CompareR8(r8) => format!("CP A, {r8}"),
             Self::ComplementA => "CPL".into(),
             Self::ComplementCarryFlag => "CCF".into(),
             Self::DAA => "DAA".into(),
@@ -413,6 +460,7 @@ impl Instruction {
             Self::LoadR8Imm8(r8) => format!("LD {r8}, 0x{:02X}", msb),
             Self::LoadR8R8((target, source)) => format!("LD {target}, {source}"),
             Self::LoadImm16SP => format!("LD 0x{:02X}{:02X}, SP", msb, lsb),
+            Self::OrR8(r8) => format!("OR A, {r8}"),
             Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
             Self::PushR16(r16_stack) => format!("PUSH {r16_stack}"),
             Self::Return => "RET".into(),
@@ -425,6 +473,7 @@ impl Instruction {
             Self::SetCarryFlag => "SCF".into(),
             Self::SubR8(r8) => format!("SUB A, {r8}"),
             Self::SubCarryR8(r8) => format!("SBC A, {r8}"),
+            Self::XorR8(r8) => format!("XOR A, {r8}"),
         }
     }
 
@@ -437,6 +486,8 @@ impl Instruction {
             Self::AddCarryR8(r8) => {
                 format!("Add value from register {r8} (and the current carry) to register A")
             }
+            Self::AndR8(r8) => format!("Bitwise AND value in register {r8} to register A"),
+            Self::CompareR8(r8) => format!("Subtract value in register {r8} from register A but discard the result (comparison)"),
             Self::ComplementA => "Negate register A bitwise".into(),
             Self::ComplementCarryFlag => "Complement the carry flag in the F register".into(),
             Self::DAA => "Decimal adjust value in register A to be valid BCD".into(),
@@ -501,6 +552,7 @@ impl Instruction {
                     msb, lsb
                 )
             }
+            Self::OrR8(r8) => format!("Bitwise OR value in register {r8} to register A"),
             Self::PopR16(r16_stack) => format!("Pop value from stack into register {r16_stack}"),
             Self::PushR16(r16_stack) => format!("Push value in {r16_stack} onto the stack"),
             Self::Return => "Return from a called function".into(),
@@ -519,6 +571,7 @@ impl Instruction {
             Self::SubCarryR8(r8) => {
                 format!("Subtract value in register {r8} (and the current carry) from register A")
             }
+            Self::XorR8(r8) => format!("Bitwise XOR value in register {r8} to register A"),
         }
     }
 }

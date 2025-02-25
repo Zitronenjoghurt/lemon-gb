@@ -340,6 +340,121 @@ fn test_add_hl_r16(
     assert!(cpu.get_f_zero());
 }
 
+/// AND r8
+#[rstest]
+#[case::b_nz(0xA0, 0b0101_1011, 0b0100_0101, R8::B, 0b0100_0001, false)]
+#[case::b_z(0xA0, 0b0101_1010, 0b1000_0101, R8::B, 0b0000_0000, true)]
+#[case::c_nz(0xA1, 0b0101_1011, 0b0100_0101, R8::C, 0b0100_0001, false)]
+#[case::c_z(0xA1, 0b0101_1010, 0b1000_0101, R8::C, 0b0000_0000, true)]
+#[case::d_nz(0xA2, 0b0101_1011, 0b0100_0101, R8::D, 0b0100_0001, false)]
+#[case::d_z(0xA2, 0b0101_1010, 0b1000_0101, R8::D, 0b0000_0000, true)]
+#[case::e_nz(0xA3, 0b0101_1011, 0b0100_0101, R8::E, 0b0100_0001, false)]
+#[case::e_z(0xA3, 0b0101_1010, 0b1000_0101, R8::E, 0b0000_0000, true)]
+#[case::h_nz(0xA4, 0b0101_1011, 0b0100_0101, R8::H, 0b0100_0001, false)]
+#[case::h_z(0xA4, 0b0101_1010, 0b1000_0101, R8::H, 0b0000_0000, true)]
+#[case::l_nz(0xA5, 0b0101_1011, 0b0100_0101, R8::L, 0b0100_0001, false)]
+#[case::l_z(0xA5, 0b0101_1010, 0b1000_0101, R8::L, 0b0000_0000, true)]
+#[case::hl_nz(0xA6, 0b0101_1011, 0b0100_0101, R8::HL, 0b0100_0001, false)]
+#[case::hl_z(0xA6, 0b0101_1010, 0b1000_0101, R8::HL, 0b0000_0000, true)]
+#[case::a_nz(0xA7, 0b0101_1011, 0b0101_1011, R8::A, 0b0101_1011, false)]
+fn test_and_r8(
+    #[case] opcode: u8,
+    #[case] value_a: u8,
+    #[case] value_r: u8,
+    #[case] register: R8,
+    #[case] expected_value: u8,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, opcode).write(0xCCCC, value_r).build();
+    let mut cpu = CPU::builder()
+        .a(value_a)
+        .hl(0xCCCC)
+        .r8(register, value_r, &mut mmu)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    if register == R8::HL {
+        assert_eq!(m, 2);
+    } else {
+        assert_eq!(m, 1);
+    }
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_carry());
+    assert!(cpu.get_f_half_carry());
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
+/// CP r8
+#[rstest]
+#[case::b_nc_nh(0xB8, 0x34, 0x21, R8::B, 0x34, false, false, false)]
+#[case::b_c_nh(0xB8, 0x34, 0x51, R8::B, 0x34, true, false, false)]
+#[case::b_nc_h(0xB8, 0x34, 0x25, R8::B, 0x34, false, true, false)]
+#[case::b_c_h(0xB8, 0x34, 0x55, R8::B, 0x34, true, true, false)]
+#[case::b_zero(0xB8, 0x00, 0x55, R8::B, 0x00, true, true, false)]
+#[case::c_nc_nh(0xB9, 0x34, 0x21, R8::C, 0x34, false, false, false)]
+#[case::c_c_nh(0xB9, 0x34, 0x51, R8::C, 0x34, true, false, false)]
+#[case::c_nc_h(0xB9, 0x34, 0x25, R8::C, 0x34, false, true, false)]
+#[case::c_c_h(0xB9, 0x34, 0x55, R8::C, 0x34, true, true, false)]
+#[case::c_zero(0xB9, 0x00, 0x55, R8::C, 0x00, true, true, false)]
+#[case::d_nc_nh(0xBA, 0x34, 0x21, R8::D, 0x34, false, false, false)]
+#[case::d_c_nh(0xBA, 0x34, 0x51, R8::D, 0x34, true, false, false)]
+#[case::d_nc_h(0xBA, 0x34, 0x25, R8::D, 0x34, false, true, false)]
+#[case::d_c_h(0xBA, 0x34, 0x55, R8::D, 0x34, true, true, false)]
+#[case::d_zero(0xBA, 0x00, 0x55, R8::D, 0x00, true, true, false)]
+#[case::e_nc_nh(0xBB, 0x34, 0x21, R8::E, 0x34, false, false, false)]
+#[case::e_c_nh(0xBB, 0x34, 0x51, R8::E, 0x34, true, false, false)]
+#[case::e_nc_h(0xBB, 0x34, 0x25, R8::E, 0x34, false, true, false)]
+#[case::e_c_h(0xBB, 0x34, 0x55, R8::E, 0x34, true, true, false)]
+#[case::e_zero(0xBB, 0x00, 0x55, R8::E, 0x00, true, true, false)]
+#[case::h_nc_nh(0xBC, 0x34, 0x21, R8::H, 0x34, false, false, false)]
+#[case::h_c_nh(0xBC, 0x34, 0x51, R8::H, 0x34, true, false, false)]
+#[case::h_nc_h(0xBC, 0x34, 0x25, R8::H, 0x34, false, true, false)]
+#[case::h_c_h(0xBC, 0x34, 0x55, R8::H, 0x34, true, true, false)]
+#[case::h_zero(0xBC, 0x00, 0x55, R8::H, 0x00, true, true, false)]
+#[case::l_nc_nh(0xBD, 0x34, 0x21, R8::L, 0x34, false, false, false)]
+#[case::l_c_nh(0xBD, 0x34, 0x51, R8::L, 0x34, true, false, false)]
+#[case::l_nc_h(0xBD, 0x34, 0x25, R8::L, 0x34, false, true, false)]
+#[case::l_c_h(0xBD, 0x34, 0x55, R8::L, 0x34, true, true, false)]
+#[case::l_zero(0xBD, 0x00, 0x55, R8::L, 0x00, true, true, false)]
+#[case::hl_nc_nh(0xBE, 0x34, 0x21, R8::HL, 0x34, false, false, false)]
+#[case::hl_c_nh(0xBE, 0x34, 0x51, R8::HL, 0x34, true, false, false)]
+#[case::hl_nc_h(0xBE, 0x34, 0x25, R8::HL, 0x34, false, true, false)]
+#[case::hl_c_h(0xBE, 0x34, 0x55, R8::HL, 0x34, true, true, false)]
+#[case::hl_zero(0xBE, 0x00, 0x55, R8::HL, 0x00, true, true, false)]
+#[case::a_zero(0xBF, 0x00, 0x00, R8::A, 0x00, false, false, true)]
+fn test_cp_r8(
+    #[case] opcode: u8,
+    #[case] value_a: u8,
+    #[case] value_r: u8,
+    #[case] register: R8,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+    #[case] expected_half_carry: bool,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, opcode).write(0xCCCC, value_r).build();
+    let mut cpu = CPU::builder()
+        .a(value_a)
+        .hl(0xCCCC)
+        .r8(register, value_r, &mut mmu)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    if register == R8::HL {
+        assert_eq!(m, 2);
+    } else {
+        assert_eq!(m, 1);
+    }
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(cpu.get_f_subtract());
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert_eq!(cpu.get_f_half_carry(), expected_half_carry);
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
 /// CPL (0x2F)
 #[test]
 fn test_cpl() {
@@ -965,6 +1080,52 @@ fn test_jr_cond_imm8(
     assert_eq!(cpu.get_pc(), target_pc);
 }
 
+/// OR r8
+#[rstest]
+#[case::b_nz(0xB0, 0b1010_1010, 0b0101_0101, R8::B, 0b1111_1111, false)]
+#[case::b_z(0xB0, 0b0000_0000, 0b0000_0000, R8::B, 0b0000_0000, true)]
+#[case::c_nz(0xB1, 0b1010_1010, 0b0101_0101, R8::C, 0b1111_1111, false)]
+#[case::c_z(0xB1, 0b0000_0000, 0b0000_0000, R8::C, 0b0000_0000, true)]
+#[case::d_nz(0xB2, 0b1010_1010, 0b0101_0101, R8::D, 0b1111_1111, false)]
+#[case::d_z(0xB2, 0b0000_0000, 0b0000_0000, R8::D, 0b0000_0000, true)]
+#[case::e_nz(0xB3, 0b1010_1010, 0b0101_0101, R8::E, 0b1111_1111, false)]
+#[case::e_z(0xB3, 0b0000_0000, 0b0000_0000, R8::E, 0b0000_0000, true)]
+#[case::h_nz(0xB4, 0b1010_1010, 0b0101_0101, R8::H, 0b1111_1111, false)]
+#[case::h_z(0xB4, 0b0000_0000, 0b0000_0000, R8::H, 0b0000_0000, true)]
+#[case::l_nz(0xB5, 0b1010_1010, 0b0101_0101, R8::L, 0b1111_1111, false)]
+#[case::l_z(0xB5, 0b0000_0000, 0b0000_0000, R8::L, 0b0000_0000, true)]
+#[case::hl_nz(0xB6, 0b1010_1010, 0b0101_0101, R8::HL, 0b1111_1111, false)]
+#[case::hl_z(0xB6, 0b0000_0000, 0b0000_0000, R8::HL, 0b0000_0000, true)]
+#[case::a_z(0xB7, 0b0000_0000, 0b0000_0000, R8::A, 0b0000_0000, true)]
+fn test_or_r8(
+    #[case] opcode: u8,
+    #[case] value_a: u8,
+    #[case] value_r: u8,
+    #[case] register: R8,
+    #[case] expected_value: u8,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, opcode).write(0xCCCC, value_r).build();
+    let mut cpu = CPU::builder()
+        .a(value_a)
+        .hl(0xCCCC)
+        .r8(register, value_r, &mut mmu)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    if register == R8::HL {
+        assert_eq!(m, 2);
+    } else {
+        assert_eq!(m, 1);
+    }
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_carry());
+    assert!(!cpu.get_f_half_carry());
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
 /// PUSH r16
 #[rstest]
 #[case::bc_push_basic(0xC5, 0xFFFE, 0x1337, 0x1337)]
@@ -1359,5 +1520,51 @@ fn test_sbc_r8(
     assert!(cpu.get_f_subtract());
     assert_eq!(cpu.get_f_carry(), expected_carry);
     assert_eq!(cpu.get_f_half_carry(), expected_half_carry);
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
+/// XOR r8
+#[rstest]
+#[case::b_nz(0xA8, 0b1010_1111, 0b1010_1010, R8::B, 0b0000_0101, false)]
+#[case::b_z(0xA8, 0b1010_0000, 0b1010_0000, R8::B, 0b0000_0000, true)]
+#[case::c_nz(0xA9, 0b1010_1111, 0b1010_1010, R8::C, 0b0000_0101, false)]
+#[case::c_z(0xA9, 0b1010_0000, 0b1010_0000, R8::C, 0b0000_0000, true)]
+#[case::d_nz(0xAA, 0b1010_1111, 0b1010_1010, R8::D, 0b0000_0101, false)]
+#[case::d_z(0xAA, 0b1010_0000, 0b1010_0000, R8::D, 0b0000_0000, true)]
+#[case::e_nz(0xAB, 0b1010_1111, 0b1010_1010, R8::E, 0b0000_0101, false)]
+#[case::e_z(0xAB, 0b1010_0000, 0b1010_0000, R8::E, 0b0000_0000, true)]
+#[case::h_nz(0xAC, 0b1010_1111, 0b1010_1010, R8::H, 0b0000_0101, false)]
+#[case::h_z(0xAC, 0b1010_0000, 0b1010_0000, R8::H, 0b0000_0000, true)]
+#[case::l_nz(0xAD, 0b1010_1111, 0b1010_1010, R8::L, 0b0000_0101, false)]
+#[case::l_z(0xAD, 0b1010_0000, 0b1010_0000, R8::L, 0b0000_0000, true)]
+#[case::hl_nz(0xAE, 0b1010_1111, 0b1010_1010, R8::HL, 0b0000_0101, false)]
+#[case::hl_z(0xAE, 0b1010_0000, 0b1010_0000, R8::HL, 0b0000_0000, true)]
+#[case::a_z(0xAF, 0b1010_0000, 0b1010_0000, R8::A, 0b0000_0000, true)]
+fn test_xor_r8(
+    #[case] opcode: u8,
+    #[case] value_a: u8,
+    #[case] value_r: u8,
+    #[case] register: R8,
+    #[case] expected_value: u8,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, opcode).write(0xCCCC, value_r).build();
+    let mut cpu = CPU::builder()
+        .a(value_a)
+        .hl(0xCCCC)
+        .r8(register, value_r, &mut mmu)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    if register == R8::HL {
+        assert_eq!(m, 2);
+    } else {
+        assert_eq!(m, 1);
+    }
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_carry());
+    assert!(!cpu.get_f_half_carry());
     assert_eq!(cpu.get_f_zero(), expected_zero);
 }
