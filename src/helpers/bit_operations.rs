@@ -74,6 +74,27 @@ pub fn add_u16(a: u16, b: u16) -> (u16, bool, bool) {
     (result, h_carry, carry)
 }
 
+/// Subtracts b from a and returns (result, half_carry, carry)
+pub fn sub_u8(a: u8, b: u8) -> (u8, bool, bool) {
+    let (result, carry) = a.overflowing_sub(b);
+
+    // Check half carry (bit 3)
+    let h_carry = (a & 0x0F) < (b & 0x0F);
+
+    (result, h_carry, carry)
+}
+
+/// Subtracts b and the given carry from a; returns (result, half_carry, carry)
+pub fn sub_carry_u8(a: u8, b: u8, carry: bool) -> (u8, bool, bool) {
+    let (result1, carry1) = a.overflowing_sub(b);
+    let (result, carry2) = result1.overflowing_sub(carry as u8);
+
+    // Check half carry (bit 3)
+    let h_carry = (a & 0x0F) < ((b & 0x0F) + (carry as u8));
+
+    (result, h_carry, carry1 || carry2)
+}
+
 /// Rotates the value left by 1, returning (result, carry)
 /// ```
 /// ┏━ Carry ━┓   ┏━━━━━━ u8 ━━━━━━━┓

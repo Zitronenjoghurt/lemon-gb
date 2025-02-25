@@ -104,6 +104,10 @@ pub enum Instruction {
     RotateRightCarryA,
     /// Sets the carry flag to 1
     SetCarryFlag,
+    /// Subtract the value in the specified register from register A
+    SubR8(R8),
+    /// Subtract the value in the specified register AND the current carry from register A
+    SubCarryR8(R8),
 }
 
 impl Instruction {
@@ -260,6 +264,22 @@ impl Instruction {
             0b1000_1101 => Ok(Instruction::AddCarryR8(R8::L)),     // 0x8D
             0b1000_1110 => Ok(Instruction::AddCarryR8(R8::HL)),    // 0x8E
             0b1000_1111 => Ok(Instruction::AddCarryR8(R8::A)),     // 0x8F
+            0b1001_0000 => Ok(Instruction::SubR8(R8::B)),          // 0x90
+            0b1001_0001 => Ok(Instruction::SubR8(R8::C)),          // 0x91
+            0b1001_0010 => Ok(Instruction::SubR8(R8::D)),          // 0x92
+            0b1001_0011 => Ok(Instruction::SubR8(R8::E)),          // 0x93
+            0b1001_0100 => Ok(Instruction::SubR8(R8::H)),          // 0x94
+            0b1001_0101 => Ok(Instruction::SubR8(R8::L)),          // 0x95
+            0b1001_0110 => Ok(Instruction::SubR8(R8::HL)),         // 0x96
+            0b1001_0111 => Ok(Instruction::SubR8(R8::A)),          // 0x97
+            0b1001_1000 => Ok(Instruction::SubCarryR8(R8::B)),     // 0x98
+            0b1001_1001 => Ok(Instruction::SubCarryR8(R8::C)),     // 0x99
+            0b1001_1010 => Ok(Instruction::SubCarryR8(R8::D)),     // 0x9A
+            0b1001_1011 => Ok(Instruction::SubCarryR8(R8::E)),     // 0x9B
+            0b1001_1100 => Ok(Instruction::SubCarryR8(R8::H)),     // 0x9C
+            0b1001_1101 => Ok(Instruction::SubCarryR8(R8::L)),     // 0x9D
+            0b1001_1110 => Ok(Instruction::SubCarryR8(R8::HL)),    // 0x9E
+            0b1001_1111 => Ok(Instruction::SubCarryR8(R8::A)),     // 0x9F
             0b1100_0000 => Ok(Instruction::ReturnCondition(JumpCondition::NotZero)), // 0xC0
             0b1100_0001 => Ok(Instruction::PopR16(R16Stack::BC)),  // 0xC1
             0b1100_0010 => Ok(Instruction::JpCondImm16(JumpCondition::NotZero)), // 0xC2
@@ -321,7 +341,9 @@ impl Instruction {
             | Self::ReturnEnableInterrupts
             | Self::Halt
             | Self::LoadR8R8(_)
-            | Self::AddCarryR8(_) => 1,
+            | Self::AddCarryR8(_)
+            | Self::SubR8(_)
+            | Self::SubCarryR8(_) => 1,
             Self::LoadR8Imm8(_) | Self::JrImm8 | Self::JrCondImm8(_) => 2,
             Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
         }
@@ -401,6 +423,8 @@ impl Instruction {
             Self::RotateLeftCarryA => "RLCA".into(),
             Self::RotateRightCarryA => "RRCA".into(),
             Self::SetCarryFlag => "SCF".into(),
+            Self::SubR8(r8) => format!("SUB A, {r8}"),
+            Self::SubCarryR8(r8) => format!("SBC A, {r8}"),
         }
     }
 
@@ -491,6 +515,10 @@ impl Instruction {
             Self::RotateLeftCarryA => "Rotate register A left, update carry flag".into(),
             Self::RotateRightCarryA => "Rotate register A right, update carry flag".into(),
             Self::SetCarryFlag => "Set carry flag".into(),
+            Self::SubR8(r8) => format!("Subtract value in register {r8} from register A"),
+            Self::SubCarryR8(r8) => {
+                format!("Subtract value in register {r8} (and the current carry) from register A")
+            }
         }
     }
 }

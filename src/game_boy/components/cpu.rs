@@ -81,6 +81,8 @@ impl CPU {
             Instruction::RotateLeftCarryA => self.rotate_left_carry_a(),
             Instruction::RotateRightCarryA => self.rotate_right_carry_a(),
             Instruction::SetCarryFlag => self.set_carry_flag(),
+            Instruction::SubR8(r8) => self.sub_r8(r8, mmu),
+            Instruction::SubCarryR8(r8) => self.sub_carry_r8(r8, mmu),
         }
     }
 
@@ -454,6 +456,35 @@ impl CPU {
         self.set_f_subtract(false);
         self.set_f_half_carry(false);
         self.instruction_result(1, 1)
+    }
+
+    pub fn sub_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
+        let source_value = self.get_r8(r8, mmu);
+        let (new_value, half_carry, carry) = sub_u8(self.get_a(), source_value);
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(true);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        let m = if r8 == R8::HL { 2 } else { 1 };
+        self.instruction_result(1, m)
+    }
+
+    pub fn sub_carry_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
+        let source_value = self.get_r8(r8, mmu);
+        let (new_value, half_carry, carry) =
+            sub_carry_u8(self.get_a(), source_value, self.get_f_carry());
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(true);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        let m = if r8 == R8::HL { 2 } else { 1 };
+        self.instruction_result(1, m)
     }
 }
 
