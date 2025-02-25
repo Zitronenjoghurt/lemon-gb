@@ -1113,6 +1113,91 @@ fn test_jump_imm16(#[case] imm1: u8, #[case] imm2: u8, #[case] expected_pc: u16)
     assert_eq!(m, 4);
 }
 
+/// LDH A, C (0xF2)
+#[test]
+fn test_ldh_a_c() {
+    let mut mmu = MMU::builder().rom(0, 0xF2).write(0xFF13, 0x68).build();
+    let mut cpu = CPU::builder().c(0x13).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), 0x68);
+}
+
+/// LDH C, A (0xE2)
+#[test]
+fn test_ldh_c_a() {
+    let mut mmu = MMU::builder().rom(0, 0xE2).build();
+    let mut cpu = CPU::builder().a(0x68).c(0x13).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(mmu.read(0xFF13), 0x68);
+}
+
+/// LDH A, imm8 (0xF0)
+#[test]
+fn test_ldh_a_imm8() {
+    let mut mmu = MMU::builder()
+        .rom(0, 0xF0)
+        .rom(1, 0x77)
+        .write(0xFF77, 0x68)
+        .build();
+    let mut cpu = CPU::default();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 3);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(cpu.get_a(), 0x68);
+}
+
+/// LDH imm8, A (0xE0)
+#[test]
+fn test_ldh_imm8_a() {
+    let mut mmu = MMU::builder().rom(0, 0xE0).rom(1, 0x77).build();
+    let mut cpu = CPU::builder().a(0x68).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 3);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(mmu.read(0xFF77), 0x68);
+}
+
+/// LD A, imm16 (0xFA)
+#[test]
+fn test_ld_a_imm16() {
+    let mut mmu = MMU::builder()
+        .rom(0, 0xFA)
+        .rom(1, 0x33)
+        .rom(2, 0xCC)
+        .write(0xCC33, 0x68)
+        .build();
+    let mut cpu = CPU::default();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 4);
+    assert_eq!(cpu.get_pc(), 3);
+    assert_eq!(cpu.get_a(), 0x68);
+}
+
+/// LD imm16, A (0xEA)
+#[test]
+fn test_ld_imm16_a() {
+    let mut mmu = MMU::builder()
+        .rom(0, 0xEA)
+        .rom(1, 0x33)
+        .rom(2, 0xCC)
+        .build();
+    let mut cpu = CPU::builder().a(0x68).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 4);
+    assert_eq!(cpu.get_pc(), 3);
+    assert_eq!(mmu.read(0xCC33), 0x68);
+}
+
 /// JUMP COND imm16
 #[rstest]
 #[case::nz_jump(0xC2, 0x34, 0x12, false, false, 0x1234, 4)]

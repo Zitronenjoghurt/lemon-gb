@@ -75,6 +75,12 @@ impl CPU {
             Instruction::LoadR8R8((target_r8, source_r8)) => {
                 self.load_r8_r8(target_r8, source_r8, mmu)
             }
+            Instruction::LoadHighAC => self.load_high_a_c(mmu),
+            Instruction::LoadHighCA => self.load_high_c_a(mmu),
+            Instruction::LoadHighAImm8 => self.load_high_a_imm8(mmu),
+            Instruction::LoadHighImm8A => self.load_high_imm8_a(mmu),
+            Instruction::LoadAImm16 => self.load_a_imm16(mmu),
+            Instruction::LoadImm16A => self.load_imm16_a(mmu),
             Instruction::LoadImm16SP => self.load_imm16_sp(mmu),
             Instruction::Nop => self.instruction_result(1, 1),
             Instruction::OrR8(r8) => self.or_r8(r8, mmu),
@@ -439,6 +445,44 @@ impl CPU {
             1
         };
         self.instruction_result(1, m)
+    }
+
+    pub fn load_high_a_c(&mut self, mmu: &MMU) -> (u16, u8) {
+        let address = construct_u16(self.get_c(), 0xFF);
+        self.set_a(mmu.read(address));
+        self.instruction_result(1, 2)
+    }
+
+    pub fn load_high_c_a(&mut self, mmu: &mut MMU) -> (u16, u8) {
+        let address = construct_u16(self.get_c(), 0xFF);
+        mmu.write(address, self.get_a());
+        self.instruction_result(1, 2)
+    }
+
+    pub fn load_high_a_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let lsb = self.read_next_imm8(mmu);
+        let address = construct_u16(lsb, 0xFF);
+        self.set_a(mmu.read(address));
+        self.instruction_result(2, 3)
+    }
+
+    pub fn load_high_imm8_a(&mut self, mmu: &mut MMU) -> (u16, u8) {
+        let lsb = self.read_next_imm8(mmu);
+        let address = construct_u16(lsb, 0xFF);
+        mmu.write(address, self.get_a());
+        self.instruction_result(2, 3)
+    }
+
+    pub fn load_a_imm16(&mut self, mmu: &MMU) -> (u16, u8) {
+        let address = self.read_next_imm16(mmu);
+        self.set_a(mmu.read(address));
+        self.instruction_result(3, 4)
+    }
+
+    pub fn load_imm16_a(&mut self, mmu: &mut MMU) -> (u16, u8) {
+        let address = self.read_next_imm16(mmu);
+        mmu.write(address, self.get_a());
+        self.instruction_result(3, 4)
     }
 
     pub fn load_imm16_sp(&mut self, mmu: &mut MMU) -> (u16, u8) {

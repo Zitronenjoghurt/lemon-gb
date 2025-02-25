@@ -15,18 +15,16 @@ fn main() {
         .filter_level(LevelFilter::Debug)
         .init();
 
-    let path = PathBuf::from("./roms/Super Mario Land.gb");
+    let path = PathBuf::from("./roms/Dr. Mario.gb");
     let cartridge = Cartridge::load(path).unwrap();
 
     let mut game_boy = GameBoy::initialize(&cartridge);
-    game_boy.step();
-    game_boy.step();
-    game_boy.step();
-    game_boy.step();
-    game_boy.step();
+    for _ in 0..67 {
+        game_boy.step();
+    }
 
     let state = game_boy.save();
     state
-        .store_binary(&PathBuf::from("./test/test.bin"))
+        .store_json(&PathBuf::from("./test/test.json"))
         .unwrap();
 }

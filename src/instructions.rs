@@ -69,6 +69,18 @@ pub enum Instruction {
     LoadR8Imm8(R8),
     /// Load the value from the register on the right into the register on the left
     LoadR8R8((R8, R8)),
+    /// Load the value from memory at address 0xFF00 + C (value in register C will be the least significant byte) into register A
+    LoadHighAC,
+    /// Load the value in register A into memory at address 0xFF00 + C (value in register C will be the least significant byte)
+    LoadHighCA,
+    /// Load the value from memory at address 0xFF00 + next byte (next byte will be the least significant byte) into register A
+    LoadHighAImm8,
+    /// Load the value in register A into memory at address 0xFF00 + next byte (next byte will be the least significant byte)
+    LoadHighImm8A,
+    /// Load the value from memory at address specified by the next 2 bytes into register A
+    LoadAImm16,
+    /// Load the value in register A into memory at address specified by the next 2 bytes
+    LoadImm16A,
     /// Load the value at the top of the stack into the address specified by the following 2 bytes
     LoadImm16SP,
     /// Does nothing, will stall a cycle
@@ -357,15 +369,21 @@ impl Instruction {
             0b1101_1001 => Ok(Instruction::ReturnEnableInterrupts), // 0xD9
             0b1101_1010 => Ok(Instruction::JpCondImm16(JumpCondition::Carry)), // 0xDA,
             0b1101_1110 => Ok(Instruction::SubCarryImm8),          // 0xDE
+            0b1110_0000 => Ok(Instruction::LoadHighImm8A),         // 0xE0
             0b1110_0001 => Ok(Instruction::PopR16(R16Stack::HL)),  // 0xE1
+            0b1110_0010 => Ok(Instruction::LoadHighCA),            // 0xE2
             0b1110_0101 => Ok(Instruction::PushR16(R16Stack::HL)), // 0xE5
             0b1110_0110 => Ok(Instruction::AndImm8),               // 0xE6
             0b1110_1001 => Ok(Instruction::JpHL),                  // 0xE9
+            0b1110_1010 => Ok(Instruction::LoadImm16A),            // 0xEA
             0b1110_1110 => Ok(Instruction::XorImm8),               // 0xEE
+            0b1111_0000 => Ok(Instruction::LoadHighAImm8),         // 0xF0
             0b1111_0001 => Ok(Instruction::PopR16(R16Stack::AF)),  // 0xF1
+            0b1111_0010 => Ok(Instruction::LoadHighAC),            // 0xF2
             0b1111_0011 => Ok(Instruction::DisableInterrupts),     // 0xF3
             0b1111_0101 => Ok(Instruction::PushR16(R16Stack::AF)), // 0xF5
             0b1111_0110 => Ok(Instruction::OrImm8),                // 0xF6
+            0b1111_1010 => Ok(Instruction::LoadAImm16),            // 0xFA
             0b1111_1011 => Ok(Instruction::EnableInterrupts),      // 0xFB
             0b1111_1110 => Ok(Instruction::CompareImm8),           // 0xFE
             _ => Err(format!("Unknown unprefixed instruction byte: {:02X}", byte).into()),
@@ -413,7 +431,9 @@ impl Instruction {
             | Self::AndR8(_)
             | Self::XorR8(_)
             | Self::OrR8(_)
-            | Self::CompareR8(_) => 1,
+            | Self::CompareR8(_)
+            | Self::LoadHighAC
+            | Self::LoadHighCA => 1,
             Self::LoadR8Imm8(_)
             | Self::JrImm8
             | Self::JrCondImm8(_)
@@ -424,8 +444,15 @@ impl Instruction {
             | Self::OrImm8
             | Self::SubImm8
             | Self::SubCarryImm8
-            | Self::XorImm8 => 2,
-            Self::JpImm16 | Self::JpCondImm16(_) | Self::LoadR16Imm16(_) | Self::LoadImm16SP => 3,
+            | Self::XorImm8
+            | Self::LoadHighAImm8
+            | Self::LoadHighImm8A => 2,
+            Self::JpImm16
+            | Self::JpCondImm16(_)
+            | Self::LoadR16Imm16(_)
+            | Self::LoadImm16SP
+            | Self::LoadAImm16
+            | Self::LoadImm16A => 3,
         }
     }
 
@@ -471,13 +498,13 @@ impl Instruction {
             Self::Nop => "NOP".into(),
             Self::AddHLR16(r16) => format!("ADD HL, {r16}"),
             Self::AddR8(r8) => format!("ADD A, {r8}"),
-            Self::AddImm8 => format!("ADD A, {:02X}", lsb),
+            Self::AddImm8 => format!("ADD A, 0x{:02X}", lsb),
             Self::AddCarryR8(r8) => format!("ADC A, {r8}"),
-            Self::AddCarryImm8 => format!("ADC A, {:02X}", lsb),
+            Self::AddCarryImm8 => format!("ADC A, 0x{:02X}", lsb),
             Self::AndR8(r8) => format!("AND A, {r8}"),
-            Self::AndImm8 => format!("AND A, {:02X}", lsb),
+            Self::AndImm8 => format!("AND A, 0x{:02X}", lsb),
             Self::CompareR8(r8) => format!("CP A, {r8}"),
-            Self::CompareImm8 => format!("CP A, {:02X}", lsb),
+            Self::CompareImm8 => format!("CP A, 0x{:02X}", lsb),
             Self::ComplementA => "CPL".into(),
             Self::ComplementCarryFlag => "CCF".into(),
             Self::DAA => "DAA".into(),
@@ -498,9 +525,15 @@ impl Instruction {
             Self::LoadR16Imm16(r16) => format!("LD {r16}, 0x{:02X}{:02X}", msb, lsb),
             Self::LoadR8Imm8(r8) => format!("LD {r8}, 0x{:02X}", msb),
             Self::LoadR8R8((target, source)) => format!("LD {target}, {source}"),
+            Self::LoadHighAC => "LDH A, [0xFF00+C]".into(),
+            Self::LoadHighCA => "LDH [0xFF00+C], A".into(),
+            Self::LoadHighAImm8 => format!("LDH A, [0xFF00+{:02X}]", lsb),
+            Self::LoadHighImm8A => format!("LDH [0xFF00+{:02X}], A", lsb),
+            Self::LoadAImm16 => format!("LD A, 0x{:02X}{:02X}", msb, lsb),
+            Self::LoadImm16A => format!("LD 0x{:02X}{:02X}, A", msb, lsb),
             Self::LoadImm16SP => format!("LD 0x{:02X}{:02X}, SP", msb, lsb),
             Self::OrR8(r8) => format!("OR A, {r8}"),
-            Self::OrImm8 => format!("OR A, {:02X}", lsb),
+            Self::OrImm8 => format!("OR A, 0x{:02X}", lsb),
             Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
             Self::PushR16(r16_stack) => format!("PUSH {r16_stack}"),
             Self::Return => "RET".into(),
@@ -512,11 +545,11 @@ impl Instruction {
             Self::RotateRightCarryA => "RRCA".into(),
             Self::SetCarryFlag => "SCF".into(),
             Self::SubR8(r8) => format!("SUB A, {r8}"),
-            Self::SubImm8 => format!("SUB A, {:02X}", lsb),
+            Self::SubImm8 => format!("SUB A, 0x{:02X}", lsb),
             Self::SubCarryR8(r8) => format!("SBC A, {r8}"),
-            Self::SubCarryImm8 => format!("SBC A, {:02X}", lsb),
+            Self::SubCarryImm8 => format!("SBC A, 0x{:02X}", lsb),
             Self::XorR8(r8) => format!("XOR A, {r8}"),
-            Self::XorImm8 => format!("XOR A, {:02X}", lsb),
+            Self::XorImm8 => format!("XOR A, 0x{:02X}", lsb),
         }
     }
 
@@ -526,15 +559,15 @@ impl Instruction {
             Self::Nop => "No Operation".into(),
             Self::AddHLR16(r16) => format!("Add value from register {r16} to register HL"),
             Self::AddR8(r8) => format!("Add value from register {r8} to register A"),
-            Self::AddImm8 => format!("Add {:02X} to register A", lsb),
+            Self::AddImm8 => format!("Add 0x{:02X} to register A", lsb),
             Self::AddCarryR8(r8) => {
                 format!("Add value from register {r8} (and the current carry) to register A")
             }
-            Self::AddCarryImm8 => format!("Add {:02X} (and the current carry) to register A", lsb),
+            Self::AddCarryImm8 => format!("Add 0x{:02X} (and the current carry) to register A", lsb),
             Self::AndR8(r8) => format!("Bitwise AND value in register {r8} to register A"),
-            Self::AndImm8 => format!("Bitwise AND {:02X} to register A", lsb),
+            Self::AndImm8 => format!("Bitwise AND 0x{:02X} to register A", lsb),
             Self::CompareR8(r8) => format!("Subtract value in register {r8} from register A but discard the result (comparison)"),
-            Self::CompareImm8 => format!("Subtract {:02X} from register A but discard the result (comparison)", lsb),
+            Self::CompareImm8 => format!("Subtract 0x{:02X} from register A but discard the result (comparison)", lsb),
             Self::ComplementA => "Negate register A bitwise".into(),
             Self::ComplementCarryFlag => "Complement the carry flag in the F register".into(),
             Self::DAA => "Decimal adjust value in register A to be valid BCD".into(),
@@ -593,6 +626,24 @@ impl Instruction {
             Self::LoadR8R8((target, source)) => {
                 format!("Load value in register {source} into register {target}")
             }
+            Self::LoadHighAC => {
+                "Load value from address 0xFF00+C into register A".into()
+            }
+            Self::LoadHighCA => {
+                "Load value from register A into address 0xFF00+C".into()
+            }
+            Self::LoadHighAImm8 => {
+                format!("Load value from address 0xFF{:02X} into register A", lsb)
+            }
+            Self::LoadHighImm8A => {
+                format!("Load value from register A into address 0xFF{:02X}", lsb)
+            }
+            Self::LoadAImm16 => {
+                format!("Load value from address 0x{:02X}{:02X} into register A", msb, lsb)
+            }
+            Self::LoadImm16A => {
+                format!("Load value from register A into address 0x{:02X}{:02X}", msb, lsb)
+            }
             Self::LoadImm16SP => {
                 format!(
                     "Load value from the top of the stack into address 0x{:02X}{:02X}",
@@ -600,7 +651,7 @@ impl Instruction {
                 )
             }
             Self::OrR8(r8) => format!("Bitwise OR value in register {r8} to register A"),
-            Self::OrImm8 => format!("Bitwise OR {:02X} to register A", lsb),
+            Self::OrImm8 => format!("Bitwise OR 0x{:02X} to register A", lsb),
             Self::PopR16(r16_stack) => format!("Pop value from stack into register {r16_stack}"),
             Self::PushR16(r16_stack) => format!("Push value in {r16_stack} onto the stack"),
             Self::Return => "Return from a called function".into(),
@@ -616,13 +667,13 @@ impl Instruction {
             Self::RotateRightCarryA => "Rotate register A right, update carry flag".into(),
             Self::SetCarryFlag => "Set carry flag".into(),
             Self::SubR8(r8) => format!("Subtract value in register {r8} from register A"),
-            Self::SubImm8 => format!("Subtract {:02X} from register A", lsb),
+            Self::SubImm8 => format!("Subtract 0x{:02X} from register A", lsb),
             Self::SubCarryR8(r8) => {
                 format!("Subtract value in register {r8} (and the current carry) from register A")
             }
-            Self::SubCarryImm8 => format!("Subtract {:02X} (and the current carry) from register A", lsb),
+            Self::SubCarryImm8 => format!("Subtract 0x{:02X} (and the current carry) from register A", lsb),
             Self::XorR8(r8) => format!("Bitwise XOR value in register {r8} to register A"),
-            Self::XorImm8 => format!("Bitwise XOR {:02X} to register A", lsb),
+            Self::XorImm8 => format!("Bitwise XOR 0x{:02X} to register A", lsb),
         }
     }
 }
