@@ -46,9 +46,13 @@ impl CPU {
         match instruction {
             Instruction::AddHLR16(r16) => self.add_hl_r16(r16),
             Instruction::AddR8(r8) => self.add_r8(r8, mmu),
+            Instruction::AddImm8 => self.add_imm8(mmu),
             Instruction::AddCarryR8(r8) => self.add_carry_r8(r8, mmu),
+            Instruction::AddCarryImm8 => self.add_carry_imm8(mmu),
             Instruction::AndR8(r8) => self.and_r8(r8, mmu),
+            Instruction::AndImm8 => self.and_imm8(mmu),
             Instruction::CompareR8(r8) => self.compare_r8(r8, mmu),
+            Instruction::CompareImm8 => self.compare_imm8(mmu),
             Instruction::ComplementA => self.complement_a(),
             Instruction::ComplementCarryFlag => self.complement_carry(),
             Instruction::DAA => self.decimal_adjust_accumulator(),
@@ -74,6 +78,7 @@ impl CPU {
             Instruction::LoadImm16SP => self.load_imm16_sp(mmu),
             Instruction::Nop => self.instruction_result(1, 1),
             Instruction::OrR8(r8) => self.or_r8(r8, mmu),
+            Instruction::OrImm8 => self.or_imm8(mmu),
             Instruction::PopR16(r16_stack) => self.pop_r16(r16_stack, mmu),
             Instruction::PushR16(r16_stack) => self.push_r16(r16_stack, mmu),
             Instruction::Return => self.return_from_func(mmu),
@@ -85,8 +90,11 @@ impl CPU {
             Instruction::RotateRightCarryA => self.rotate_right_carry_a(),
             Instruction::SetCarryFlag => self.set_carry_flag(),
             Instruction::SubR8(r8) => self.sub_r8(r8, mmu),
+            Instruction::SubImm8 => self.sub_imm8(mmu),
             Instruction::SubCarryR8(r8) => self.sub_carry_r8(r8, mmu),
+            Instruction::SubCarryImm8 => self.sub_carry_imm8(mmu),
             Instruction::XorR8(r8) => self.xor_r8(r8, mmu),
+            Instruction::XorImm8 => self.xor_imm8(mmu),
         }
     }
 
@@ -221,6 +229,33 @@ impl CPU {
         self.instruction_result(1, 2)
     }
 
+    pub fn add_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.read_next_imm8(mmu);
+        let (new_value, half_carry, carry) = add_u8(self.get_a(), source_value);
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        self.instruction_result(2, 2)
+    }
+
+    pub fn add_carry_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.read_next_imm8(mmu);
+        let (new_value, half_carry, carry) =
+            add_carry_u8(self.get_a(), source_value, self.get_f_carry());
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        self.instruction_result(2, 2)
+    }
+
     pub fn and_r8(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
         let source_value = self.get_r8(r8, mmu);
         let new_value = self.get_a() & source_value;
@@ -235,6 +270,19 @@ impl CPU {
         self.instruction_result(1, m)
     }
 
+    pub fn and_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.read_next_imm8(mmu);
+        let new_value = self.get_a() & source_value;
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(true);
+        self.set_f_carry(false);
+
+        self.instruction_result(2, 2)
+    }
+
     pub fn compare_r8(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
         let source_value = self.get_r8(r8, mmu);
         let (ignored_result, half_carry, carry) = sub_u8(self.get_a(), source_value);
@@ -246,6 +294,18 @@ impl CPU {
 
         let m = if r8 == R8::HL { 2 } else { 1 };
         self.instruction_result(1, m)
+    }
+
+    pub fn compare_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.read_next_imm8(mmu);
+        let (ignored_result, half_carry, carry) = sub_u8(self.get_a(), source_value);
+
+        self.set_f_zero(ignored_result == 0);
+        self.set_f_subtract(true);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        self.instruction_result(2, 2)
     }
 
     pub fn complement_a(&mut self) -> (u16, u8) {
@@ -391,18 +451,6 @@ impl CPU {
         self.instruction_result(3, 5)
     }
 
-    pub fn pop_r16(&mut self, r16_stack: R16Stack, mmu: &MMU) -> (u16, u8) {
-        let value = self.pop_u16(mmu);
-        self.set_r16_stack(r16_stack, value);
-        self.instruction_result(1, 3)
-    }
-
-    pub fn push_r16(&mut self, r16_stack: R16Stack, mmu: &mut MMU) -> (u16, u8) {
-        let value = self.get_r16_stack(r16_stack);
-        self.push_u16(value, mmu);
-        self.instruction_result(1, 4)
-    }
-
     pub fn jump_hl(&mut self) -> (u16, u8) {
         let new_pc = self.get_hl();
         (new_pc, 1)
@@ -450,6 +498,31 @@ impl CPU {
 
         let m = if r8 == R8::HL { 2 } else { 1 };
         self.instruction_result(1, m)
+    }
+
+    pub fn or_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.read_next_imm8(mmu);
+        let new_value = self.get_a() | source_value;
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(false);
+
+        self.instruction_result(2, 2)
+    }
+
+    pub fn pop_r16(&mut self, r16_stack: R16Stack, mmu: &MMU) -> (u16, u8) {
+        let value = self.pop_u16(mmu);
+        self.set_r16_stack(r16_stack, value);
+        self.instruction_result(1, 3)
+    }
+
+    pub fn push_r16(&mut self, r16_stack: R16Stack, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r16_stack(r16_stack);
+        self.push_u16(value, mmu);
+        self.instruction_result(1, 4)
     }
 
     pub fn return_from_func(&mut self, mmu: &MMU) -> (u16, u8) {
@@ -517,6 +590,19 @@ impl CPU {
         self.instruction_result(1, m)
     }
 
+    pub fn sub_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.read_next_imm8(mmu);
+        let (new_value, half_carry, carry) = sub_u8(self.get_a(), source_value);
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(true);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        self.instruction_result(2, 2)
+    }
+
     pub fn sub_carry_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
         let source_value = self.get_r8(r8, mmu);
         let (new_value, half_carry, carry) =
@@ -532,6 +618,20 @@ impl CPU {
         self.instruction_result(1, m)
     }
 
+    pub fn sub_carry_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.read_next_imm8(mmu);
+        let (new_value, half_carry, carry) =
+            sub_carry_u8(self.get_a(), source_value, self.get_f_carry());
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(true);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        self.instruction_result(2, 2)
+    }
+
     pub fn xor_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
         let source_value = self.get_r8(r8, mmu);
         let new_value = self.get_a() ^ source_value;
@@ -544,6 +644,19 @@ impl CPU {
 
         let m = if r8 == R8::HL { 2 } else { 1 };
         self.instruction_result(1, m)
+    }
+
+    pub fn xor_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let source_value = self.read_next_imm8(mmu);
+        let new_value = self.get_a() ^ source_value;
+
+        self.set_a(new_value);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(false);
+
+        self.instruction_result(2, 2)
     }
 }
 

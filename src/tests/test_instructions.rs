@@ -187,6 +187,35 @@ fn test_add_a(
     assert_eq!(m, 1);
 }
 
+/// ADD imm8 (0xC6)
+#[rstest]
+#[case::nc_nh_nz(0x12, 0x23, 0x35, false, false, false)]
+#[case::c_nh_nz(0x12, 0xF3, 0x05, true, false, false)]
+#[case::nc_h_nz(0x12, 0x2F, 0x41, false, true, false)]
+#[case::c_h_nz(0x12, 0xFF, 0x11, true, true, false)]
+#[case::nc_nh_z(0x00, 0x00, 0x00, false, false, true)]
+#[case::c_h_z(0xFF, 0x01, 0x00, true, true, true)]
+fn test_add_imm8(
+    #[case] value_a: u8,
+    #[case] imm: u8,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+    #[case] expected_half_carry: bool,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, 0xC6).rom(1, imm).build();
+    let mut cpu = CPU::builder().a(value_a).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert_eq!(cpu.get_f_half_carry(), expected_half_carry);
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+    assert!(!cpu.get_f_subtract());
+}
+
 /// ADC r8
 #[rstest]
 #[case::b_nc_nc_nh(0x88, 0x23, 0x12, R8::B, false, 0x35, false, false, false)]
@@ -294,6 +323,41 @@ fn test_adc_r8(
     assert_eq!(cpu.get_f_zero(), expected_zero);
 }
 
+/// ADC imm8 (0xCE)
+#[rstest]
+#[case::nc_nc_nh_nz(0x12, 0x23, false, 0x35, false, false, false)]
+#[case::c_nc_nh_nz(0x12, 0x23, true, 0x36, false, false, false)]
+#[case::nc_c_nh_nz(0x12, 0xF3, false, 0x05, true, false, false)]
+#[case::c_c_nh_nz(0x12, 0xF3, true, 0x06, true, false, false)]
+#[case::nc_nc_h_nz(0x12, 0x2F, false, 0x41, false, true, false)]
+#[case::c_nc_h_nz(0x12, 0x2F, true, 0x42, false, true, false)]
+#[case::nc_c_h_nz(0x12, 0xFF, false, 0x11, true, true, false)]
+#[case::c_c_h_nz(0x12, 0xFF, true, 0x12, true, true, false)]
+#[case::nc_nc_nh_z(0x00, 0x00, false, 0x00, false, false, true)]
+#[case::nc_c_h_z(0xFF, 0x01, false, 0x00, true, true, true)]
+#[case::c_c_h_z(0xFE, 0x01, true, 0x00, true, true, true)]
+fn test_adc_imm8(
+    #[case] value_a: u8,
+    #[case] imm: u8,
+    #[case] carry: bool,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+    #[case] expected_half_carry: bool,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, 0xCE).rom(1, imm).build();
+    let mut cpu = CPU::builder().a(value_a).f_carry(carry).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert_eq!(cpu.get_f_half_carry(), expected_half_carry);
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+    assert!(!cpu.get_f_subtract());
+}
+
 /// ADD HL r16
 #[rstest]
 #[case::bc_no_carry(0x09, 0x1234, 0x2345, 0x3579, false, false)]
@@ -386,6 +450,29 @@ fn test_and_r8(
     assert_eq!(cpu.get_f_zero(), expected_zero);
 }
 
+/// AND imm8 (0xE6)
+#[rstest]
+#[case::nz(0b0101_1011, 0b0100_0101, 0b0100_0001, false)]
+#[case::z(0b0101_1010, 0b1000_0101, 0b0000_0000, true)]
+fn test_and_imm8(
+    #[case] value_a: u8,
+    #[case] imm: u8,
+    #[case] expected_value: u8,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, 0xE6).rom(1, imm).build();
+    let mut cpu = CPU::builder().a(value_a).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_carry());
+    assert!(cpu.get_f_half_carry());
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
 /// CP r8
 #[rstest]
 #[case::b_nc_nh(0xB8, 0x34, 0x21, R8::B, 0x34, false, false, false)]
@@ -448,6 +535,34 @@ fn test_cp_r8(
         assert_eq!(m, 1);
     }
     assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(cpu.get_f_subtract());
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert_eq!(cpu.get_f_half_carry(), expected_half_carry);
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
+/// CP imm8 (0xFE)
+#[rstest]
+#[case::b_nc_nh(0x34, 0x21, 0x34, false, false, false)]
+#[case::b_c_nh(0x34, 0x51, 0x34, true, false, false)]
+#[case::b_nc_h(0x34, 0x25, 0x34, false, true, false)]
+#[case::b_c_h(0x34, 0x55, 0x34, true, true, false)]
+#[case::b_zero(0x00, 0x55, 0x00, true, true, false)]
+fn test_cp_imm8(
+    #[case] value_a: u8,
+    #[case] imm: u8,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+    #[case] expected_half_carry: bool,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, 0xFE).rom(1, imm).build();
+    let mut cpu = CPU::builder().a(value_a).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 2);
     assert_eq!(cpu.get_a(), expected_value);
     assert!(cpu.get_f_subtract());
     assert_eq!(cpu.get_f_carry(), expected_carry);
@@ -1126,6 +1241,29 @@ fn test_or_r8(
     assert_eq!(cpu.get_f_zero(), expected_zero);
 }
 
+/// OR imm8 (0xF6)
+#[rstest]
+#[case::b_nz(0b1010_1010, 0b0101_0101, 0b1111_1111, false)]
+#[case::b_z(0b0000_0000, 0b0000_0000, 0b0000_0000, true)]
+fn test_or_imm8(
+    #[case] value_a: u8,
+    #[case] imm: u8,
+    #[case] expected_value: u8,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, 0xF6).rom(1, imm).build();
+    let mut cpu = CPU::builder().a(value_a).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_carry());
+    assert!(!cpu.get_f_half_carry());
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
 /// PUSH r16
 #[rstest]
 #[case::bc_push_basic(0xC5, 0xFFFE, 0x1337, 0x1337)]
@@ -1423,6 +1561,34 @@ fn test_sub_r8(
     assert_eq!(cpu.get_f_zero(), expected_zero);
 }
 
+/// SUB imm8 (0xD6)
+#[rstest]
+#[case::b_nc_nh(0x34, 0x21, 0x13, false, false, false)]
+#[case::b_c_nh(0x34, 0x51, 0xE3, true, false, false)]
+#[case::b_nc_h(0x34, 0x25, 0x0F, false, true, false)]
+#[case::b_c_h(0x34, 0x55, 0xDF, true, true, false)]
+#[case::b_zero(0x55, 0x55, 0x00, false, false, true)]
+fn test_sub_imm8(
+    #[case] value_a: u8,
+    #[case] imm: u8,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+    #[case] expected_half_carry: bool,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, 0xD6).rom(1, imm).build();
+    let mut cpu = CPU::builder().a(value_a).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(cpu.get_f_subtract());
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert_eq!(cpu.get_f_half_carry(), expected_half_carry);
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
 /// SBC r8
 #[rstest]
 #[case::b_nc_nc_nh(0x98, 0x34, 0x21, R8::B, false, 0x13, false, false, false)]
@@ -1523,6 +1689,40 @@ fn test_sbc_r8(
     assert_eq!(cpu.get_f_zero(), expected_zero);
 }
 
+/// SBC imm8 (0xDE)
+#[rstest]
+#[case::nc_nc_nh(0x34, 0x21, false, 0x13, false, false, false)]
+#[case::c_nc_nh(0x34, 0x21, true, 0x12, false, false, false)]
+#[case::nc_c_nh(0x34, 0x51, false, 0xE3, true, false, false)]
+#[case::c_c_nh(0x34, 0x51, true, 0xE2, true, false, false)]
+#[case::nc_nc_h(0x34, 0x25, false, 0x0F, false, true, false)]
+#[case::c_nc_h(0x34, 0x25, true, 0x0E, false, true, false)]
+#[case::nc_c_h(0x34, 0x55, false, 0xDF, true, true, false)]
+#[case::c_c_h(0x34, 0x55, true, 0xDE, true, true, false)]
+#[case::nc_zero(0x55, 0x55, false, 0x00, false, false, true)]
+#[case::c_zero(0x56, 0x55, true, 0x00, false, false, true)]
+fn test_sbc_imm8(
+    #[case] value_a: u8,
+    #[case] imm: u8,
+    #[case] carry: bool,
+    #[case] expected_value: u8,
+    #[case] expected_carry: bool,
+    #[case] expected_half_carry: bool,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, 0xDE).rom(1, imm).build();
+    let mut cpu = CPU::builder().a(value_a).f_carry(carry).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(cpu.get_f_subtract());
+    assert_eq!(cpu.get_f_carry(), expected_carry);
+    assert_eq!(cpu.get_f_half_carry(), expected_half_carry);
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
 /// XOR r8
 #[rstest]
 #[case::b_nz(0xA8, 0b1010_1111, 0b1010_1010, R8::B, 0b0000_0101, false)]
@@ -1562,6 +1762,29 @@ fn test_xor_r8(
         assert_eq!(m, 1);
     }
     assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_a(), expected_value);
+    assert!(!cpu.get_f_subtract());
+    assert!(!cpu.get_f_carry());
+    assert!(!cpu.get_f_half_carry());
+    assert_eq!(cpu.get_f_zero(), expected_zero);
+}
+
+/// XOR imm8 (0xEE)
+#[rstest]
+#[case::nz(0b1010_1111, 0b1010_1010, 0b0000_0101, false)]
+#[case::z(0b1010_0000, 0b1010_0000, 0b0000_0000, true)]
+fn test_xor_imm8(
+    #[case] value_a: u8,
+    #[case] imm: u8,
+    #[case] expected_value: u8,
+    #[case] expected_zero: bool,
+) {
+    let mut mmu = MMU::builder().rom(0, 0xEE).rom(1, imm).build();
+    let mut cpu = CPU::builder().a(value_a).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 2);
     assert_eq!(cpu.get_a(), expected_value);
     assert!(!cpu.get_f_subtract());
     assert!(!cpu.get_f_carry());
