@@ -104,6 +104,8 @@ pub enum Instruction {
     PopR16(R16Stack),
     /// Push 2 bytes from the specified register to the stack
     PushR16(R16Stack),
+    /// Unconditional quick function call to the address encoded within the instruction
+    RestartVector(u8),
     /// Return from a previous function call
     Return,
     /// Return from a previous function call if a certain condition is met
@@ -367,44 +369,52 @@ impl Instruction {
             0b1100_0100 => Ok(Self::CallCondition(JumpCondition::NotZero)), // 0xC4
             0b1100_0101 => Ok(Self::PushR16(R16Stack::BC)),               // 0xC5
             0b1100_0110 => Ok(Self::AddImm8),                             // 0xC6
+            0b1100_0111 => Ok(Self::RestartVector(0x00)),                 // 0xC7
             0b1100_1000 => Ok(Self::ReturnCondition(JumpCondition::Zero)), // 0xC8
             0b1100_1001 => Ok(Self::Return),                              // 0xC9
             0b1100_1010 => Ok(Self::JpCondImm16(JumpCondition::Zero)),    // 0xCA
             0b1100_1100 => Ok(Self::CallCondition(JumpCondition::Zero)),  // 0xCC
             0b1100_1101 => Ok(Self::Call),                                // 0xCD
             0b1100_1110 => Ok(Self::AddCarryImm8),                        // 0xCE
+            0b1100_1111 => Ok(Self::RestartVector(0x08)),                 // 0xCF
             0b1101_0000 => Ok(Self::ReturnCondition(JumpCondition::NotCarry)), // 0xD0
             0b1101_0001 => Ok(Self::PopR16(R16Stack::DE)),                // 0xD1
             0b1101_0010 => Ok(Self::JpCondImm16(JumpCondition::NotCarry)), // 0xD2
             0b1101_0100 => Ok(Self::CallCondition(JumpCondition::NotCarry)), // 0xD4
             0b1101_0101 => Ok(Self::PushR16(R16Stack::DE)),               // 0xD5
             0b1101_0110 => Ok(Self::SubImm8),                             // 0xD6
+            0b1101_0111 => Ok(Self::RestartVector(0x10)),                 // 0xD7
             0b1101_1000 => Ok(Self::ReturnCondition(JumpCondition::Carry)), // 0xD8
             0b1101_1001 => Ok(Self::ReturnEnableInterrupts),              // 0xD9
             0b1101_1010 => Ok(Self::JpCondImm16(JumpCondition::Carry)),   // 0xDA,
             0b1101_1100 => Ok(Self::CallCondition(JumpCondition::Carry)), // 0xDC
             0b1101_1110 => Ok(Self::SubCarryImm8),                        // 0xDE
+            0b1101_1111 => Ok(Self::RestartVector(0x18)),                 // 0xDF
             0b1110_0000 => Ok(Self::LoadHighImm8A),                       // 0xE0
             0b1110_0001 => Ok(Self::PopR16(R16Stack::HL)),                // 0xE1
             0b1110_0010 => Ok(Self::LoadHighCA),                          // 0xE2
             0b1110_0101 => Ok(Self::PushR16(R16Stack::HL)),               // 0xE5
             0b1110_0110 => Ok(Self::AndImm8),                             // 0xE6
+            0b1110_0111 => Ok(Self::RestartVector(0x0020)),               // 0xE7
             0b1110_1000 => Ok(Self::AddSpImm8),                           // 0xE8
             0b1110_1001 => Ok(Self::JpHL),                                // 0xE9
             0b1110_1010 => Ok(Self::LoadImm16A),                          // 0xEA
             0b1110_1110 => Ok(Self::XorImm8),                             // 0xEE
+            0b1110_1111 => Ok(Self::RestartVector(0x28)),                 // 0xEF
             0b1111_0000 => Ok(Self::LoadHighAImm8),                       // 0xF0
             0b1111_0001 => Ok(Self::PopR16(R16Stack::AF)),                // 0xF1
             0b1111_0010 => Ok(Self::LoadHighAC),                          // 0xF2
             0b1111_0011 => Ok(Self::DisableInterrupts),                   // 0xF3
             0b1111_0101 => Ok(Self::PushR16(R16Stack::AF)),               // 0xF5
             0b1111_0110 => Ok(Self::OrImm8),                              // 0xF6
+            0b1111_0111 => Ok(Self::RestartVector(0x30)),                 // 0xF7
             0b1111_1000 => Ok(Self::LoadHlSpImm8),                        // 0xF8
             0b1111_1001 => Ok(Self::LoadSpHl),                            // 0xF9
             0b1111_1010 => Ok(Self::LoadAImm16),                          // 0xFA
             0b1111_1011 => Ok(Self::EnableInterrupts),                    // 0xFB
             0b1111_1110 => Ok(Self::CompareImm8),                         // 0xFE
-            _ => Err(format!("Unknown unprefixed instruction byte: {:02X}", byte).into()),
+            0b1111_1111 => Ok(Self::RestartVector(0x38)),                 // 0xFF
+            _ => Err(format!("Illegal unprefixed instruction byte: {:02X}", byte).into()),
         }
     }
 
@@ -452,7 +462,8 @@ impl Instruction {
             | Self::CompareR8(_)
             | Self::LoadHighAC
             | Self::LoadHighCA
-            | Self::LoadSpHl => 1,
+            | Self::LoadSpHl
+            | Self::RestartVector(_) => 1,
             Self::LoadR8Imm8(_)
             | Self::JrImm8
             | Self::JrCondImm8(_)
@@ -564,6 +575,7 @@ impl Instruction {
             Self::OrImm8 => format!("OR A, 0x{:02X}", lsb),
             Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
             Self::PushR16(r16_stack) => format!("PUSH {r16_stack}"),
+            Self::RestartVector(address) => format!("RST 0x{:02X}", address),
             Self::Return => "RET".into(),
             Self::ReturnCondition(cond) => format!("RET {cond}"),
             Self::ReturnEnableInterrupts => "RETI".into(),
@@ -691,6 +703,7 @@ impl Instruction {
             Self::OrImm8 => format!("Bitwise OR 0x{:02X} to register A", lsb),
             Self::PopR16(r16_stack) => format!("Pop value from stack into register {r16_stack}"),
             Self::PushR16(r16_stack) => format!("Push value in {r16_stack} onto the stack"),
+            Self::RestartVector(address) => format!("Restart vector to address 0x{:02X}", address),
             Self::Return => "Return from a called function".into(),
             Self::ReturnCondition(cond) => {
                 format!("If {}, return from a called function", cond.description())

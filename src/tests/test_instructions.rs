@@ -1664,6 +1664,25 @@ fn test_rlca_rrca(
     assert!(!cpu.get_f_zero());
 }
 
+/// RST
+#[rstest]
+#[case(0xC7, 0x0000)]
+#[case(0xCF, 0x0008)]
+#[case(0xD7, 0x0010)]
+#[case(0xDF, 0x0018)]
+#[case(0xE7, 0x0020)]
+#[case(0xEF, 0x0028)]
+#[case(0xF7, 0x0030)]
+#[case(0xFF, 0x0038)]
+fn test_rst(#[case] opcode: u8, #[case] expected_pc: u16) {
+    let mut mmu = MMU::builder().rom(0, opcode).build();
+    let mut cpu = CPU::default();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 4);
+    assert_eq!(cpu.get_pc(), expected_pc);
+}
+
 /// SCF (0x37)
 #[test]
 fn test_scf() {

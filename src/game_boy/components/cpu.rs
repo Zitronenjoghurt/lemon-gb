@@ -92,6 +92,7 @@ impl CPU {
             Instruction::OrImm8 => self.or_imm8(mmu),
             Instruction::PopR16(r16_stack) => self.pop_r16(r16_stack, mmu),
             Instruction::PushR16(r16_stack) => self.push_r16(r16_stack, mmu),
+            Instruction::RestartVector(address) => self.restart_vector(address, mmu),
             Instruction::Return => self.return_from_func(mmu),
             Instruction::ReturnCondition(cond) => self.return_from_func_cond(cond, mmu),
             Instruction::ReturnEnableInterrupts => self.return_from_func_enable_interrupts(mmu),
@@ -620,6 +621,12 @@ impl CPU {
         let value = self.get_r16_stack(r16_stack);
         self.push_u16(value, mmu);
         self.instruction_result(1, 4)
+    }
+
+    pub fn restart_vector(&mut self, address_lsb: u8, mmu: &mut MMU) -> (u16, u8) {
+        let address = construct_u16(address_lsb, 0x00);
+        self.push_u16(self.get_pc(), mmu);
+        (address, 4)
     }
 
     pub fn return_from_func(&mut self, mmu: &MMU) -> (u16, u8) {
