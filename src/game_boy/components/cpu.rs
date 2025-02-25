@@ -52,6 +52,8 @@ impl CPU {
             Instruction::AddSpImm8 => self.add_sp_imm8(mmu),
             Instruction::AndR8(r8) => self.and_r8(r8, mmu),
             Instruction::AndImm8 => self.and_imm8(mmu),
+            Instruction::Call => self.call(mmu),
+            Instruction::CallCondition(cond) => self.call_conditional(cond, mmu),
             Instruction::CompareR8(r8) => self.compare_r8(r8, mmu),
             Instruction::CompareImm8 => self.compare_imm8(mmu),
             Instruction::ComplementA => self.complement_a(),
@@ -302,6 +304,22 @@ impl CPU {
         self.set_f_carry(carry);
 
         self.instruction_result(2, 4)
+    }
+
+    pub fn call(&mut self, mmu: &mut MMU) -> (u16, u8) {
+        let func_address = self.read_next_imm16(mmu);
+        self.push_u16(self.get_pc(), mmu);
+        (func_address, 6)
+    }
+
+    pub fn call_conditional(&mut self, jump_condition: JumpCondition, mmu: &mut MMU) -> (u16, u8) {
+        let should_jump = self.check_jump_condition(jump_condition);
+
+        if should_jump {
+            self.call(mmu)
+        } else {
+            self.instruction_result(3, 3)
+        }
     }
 
     pub fn compare_r8(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
@@ -809,7 +827,7 @@ impl CPU {
                 "PC(0x{:04X}) [0x{:02X}]: {}",
                 self.get_pc(),
                 instruction_byte,
-                instruction.parse_clear_text(next_lsb, next_msb)
+                instruction.parse_description(next_lsb, next_msb)
             );
         }
     }

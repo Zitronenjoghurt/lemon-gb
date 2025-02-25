@@ -489,6 +489,62 @@ fn test_and_imm8(
     assert_eq!(cpu.get_f_zero(), expected_zero);
 }
 
+/// Call (0xCD)
+#[test]
+fn test_call() {
+    let mut mmu = MMU::builder()
+        .rom(0x11FD, 0xCD)
+        .rom(0x11FE, 0xFF)
+        .rom(0x11FF, 0xCC)
+        .build();
+    let mut cpu = CPU::builder().pc(0x11FD).sp(0xFFFE).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 6);
+    assert_eq!(cpu.get_pc(), 0xCCFF);
+    assert_eq!(mmu.read_16(0xFFFC), 0x11FD);
+}
+
+/// Call cond
+#[rstest]
+#[case::nz_no(0xC4, 0x11FD, 0xFFFE, 0xFF, 0xCC, true, false, 0x1200, 0xFFFE, 3)]
+#[case::nz_yes(0xC4, 0x11FD, 0xFFFE, 0xFF, 0xCC, false, false, 0xCCFF, 0xFFFC, 6)]
+#[case::z_no(0xCC, 0x11FD, 0xFFFE, 0xFF, 0xCC, false, false, 0x1200, 0xFFFE, 3)]
+#[case::z_yes(0xCC, 0x11FD, 0xFFFE, 0xFF, 0xCC, true, false, 0xCCFF, 0xFFFC, 6)]
+#[case::nc_no(0xD4, 0x11FD, 0xFFFE, 0xFF, 0xCC, false, true, 0x1200, 0xFFFE, 3)]
+#[case::nc_yes(0xD4, 0x11FD, 0xFFFE, 0xFF, 0xCC, false, false, 0xCCFF, 0xFFFC, 6)]
+#[case::c_no(0xDC, 0x11FD, 0xFFFE, 0xFF, 0xCC, false, false, 0x1200, 0xFFFE, 3)]
+#[case::c_yes(0xDC, 0x11FD, 0xFFFE, 0xFF, 0xCC, false, true, 0xCCFF, 0xFFFC, 6)]
+fn test_call_cond(
+    #[case] opcode: u8,
+    #[case] initial_pc: u16,
+    #[case] initial_sp: u16,
+    #[case] imm1: u8,
+    #[case] imm2: u8,
+    #[case] flag_zero: bool,
+    #[case] flag_carry: bool,
+    #[case] expected_pc: u16,
+    #[case] expected_sp: u16,
+    #[case] expected_m: u8,
+) {
+    let mut mmu = MMU::builder()
+        .rom(initial_pc, opcode)
+        .rom(initial_pc + 1, imm1)
+        .rom(initial_pc + 2, imm2)
+        .build();
+    let mut cpu = CPU::builder()
+        .pc(initial_pc)
+        .sp(initial_sp)
+        .f_zero(flag_zero)
+        .f_carry(flag_carry)
+        .build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, expected_m);
+    assert_eq!(cpu.get_pc(), expected_pc);
+    assert_eq!(cpu.get_sp(), expected_sp);
+}
+
 /// CP r8
 #[rstest]
 #[case::b_nc_nh(0xB8, 0x34, 0x21, R8::B, 0x34, false, false, false)]
