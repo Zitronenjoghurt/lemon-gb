@@ -53,9 +53,9 @@ pub enum Instruction {
     JpImm16,
     /// Conditional jump to the address specified in the following 2 bytes
     JpCondImm16(JumpCondition),
-    /// Unconditional relative jump incrementing the program counter by the specified byte
+    /// Unconditional relative jump adding the next byte (signed) to the program counter
     JrImm8,
-    /// Conditional relative jump incrementing the program counter by the specified byte
+    /// Conditional relative jump adding the next byte (signed) to the program counter
     JrCondImm8(JumpCondition),
     /// Loads the value from the address stored in the provided register into register A
     /// For HL-, HL is decremented after the operation
@@ -85,6 +85,10 @@ pub enum Instruction {
     LoadImm16A,
     /// Load the value at the top of the stack into the address specified by the following 2 bytes
     LoadImm16SP,
+    /// Load the stack pointer added with the next byte (signed) into register HL
+    LoadHlSpImm8,
+    /// Load register HL into register SP
+    LoadSpHl,
     /// Does nothing, will stall a cycle
     #[default]
     Nop,
@@ -386,6 +390,8 @@ impl Instruction {
             0b1111_0011 => Ok(Instruction::DisableInterrupts),     // 0xF3
             0b1111_0101 => Ok(Instruction::PushR16(R16Stack::AF)), // 0xF5
             0b1111_0110 => Ok(Instruction::OrImm8),                // 0xF6
+            0b1111_1000 => Ok(Instruction::LoadHlSpImm8),          // 0xF8
+            0b1111_1001 => Ok(Instruction::LoadSpHl),              // 0xF9
             0b1111_1010 => Ok(Instruction::LoadAImm16),            // 0xFA
             0b1111_1011 => Ok(Instruction::EnableInterrupts),      // 0xFB
             0b1111_1110 => Ok(Instruction::CompareImm8),           // 0xFE
@@ -436,7 +442,8 @@ impl Instruction {
             | Self::OrR8(_)
             | Self::CompareR8(_)
             | Self::LoadHighAC
-            | Self::LoadHighCA => 1,
+            | Self::LoadHighCA
+            | Self::LoadSpHl => 1,
             Self::LoadR8Imm8(_)
             | Self::JrImm8
             | Self::JrCondImm8(_)
@@ -450,7 +457,8 @@ impl Instruction {
             | Self::XorImm8
             | Self::LoadHighAImm8
             | Self::LoadHighImm8A
-            | Self::AddSpImm8 => 2,
+            | Self::AddSpImm8
+            | Self::LoadHlSpImm8 => 2,
             Self::JpImm16
             | Self::JpCondImm16(_)
             | Self::LoadR16Imm16(_)
@@ -523,8 +531,8 @@ impl Instruction {
             Self::JpHL => "JP HL".into(),
             Self::JpImm16 => format!("JP 0x{:02X}{:02X}", msb, lsb),
             Self::JpCondImm16(cond) => format!("JP {cond}, 0x{:02X}{:02X}", msb, lsb),
-            Self::JrImm8 => format!("JR 0x{:02X}", lsb),
-            Self::JrCondImm8(cond) => format!("JR {cond}, 0x{:02X}", lsb),
+            Self::JrImm8 => format!("JR 0x{:02X}", lsb as i8),
+            Self::JrCondImm8(cond) => format!("JR {cond}, 0x{:02X}", lsb as i8),
             Self::LoadAR16(r16_mem) => format!("LD A, {r16_mem}"),
             Self::LoadR16A(r16_mem) => format!("LD {r16_mem}, A"),
             Self::LoadR16Imm16(r16) => format!("LD {r16}, 0x{:02X}{:02X}", msb, lsb),
@@ -537,6 +545,8 @@ impl Instruction {
             Self::LoadAImm16 => format!("LD A, 0x{:02X}{:02X}", msb, lsb),
             Self::LoadImm16A => format!("LD 0x{:02X}{:02X}, A", msb, lsb),
             Self::LoadImm16SP => format!("LD 0x{:02X}{:02X}, SP", msb, lsb),
+            Self::LoadHlSpImm8 => format!("LD HL, SP+0x{:02X}", lsb as i8),
+            Self::LoadSpHl => "LD SP, HL".into(),
             Self::OrR8(r8) => format!("OR A, {r8}"),
             Self::OrImm8 => format!("OR A, 0x{:02X}", lsb),
             Self::PopR16(r16_stack) => format!("POP {r16_stack}"),
@@ -595,14 +605,14 @@ impl Instruction {
                 )
             }
             Self::JrImm8 => format!(
-                "Jump relative, incrementing the program counter by 0x{:02X}",
-                lsb
+                "Jump relative, adding 0x{:02X} to the program counter",
+                lsb as i8
             ),
             Self::JrCondImm8(cond) => {
                 format!(
-                    "If {}, jump relative, incrementing the program counter by 0x{:02X}",
+                    "If {}, jump relative, adding 0x{:02X} to the program counter",
                     cond.description(),
-                    lsb,
+                    lsb as i8,
                 )
             }
             Self::LoadAR16(r16_mem) => {
@@ -655,6 +665,12 @@ impl Instruction {
                     "Load value from the top of the stack into address 0x{:02X}{:02X}",
                     msb, lsb
                 )
+            }
+            Self::LoadHlSpImm8 => {
+                format!("Load SP+0x{:02X} into register HL", lsb as i8)
+            }
+            Self::LoadSpHl => {
+                "Load value from register HL into register SP".into()
             }
             Self::OrR8(r8) => format!("Bitwise OR value in register {r8} to register A"),
             Self::OrImm8 => format!("Bitwise OR 0x{:02X} to register A", lsb),

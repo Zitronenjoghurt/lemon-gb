@@ -83,6 +83,8 @@ impl CPU {
             Instruction::LoadAImm16 => self.load_a_imm16(mmu),
             Instruction::LoadImm16A => self.load_imm16_a(mmu),
             Instruction::LoadImm16SP => self.load_imm16_sp(mmu),
+            Instruction::LoadHlSpImm8 => self.load_hl_sp_imm8(mmu),
+            Instruction::LoadSpHl => self.load_sp_hl(),
             Instruction::Nop => self.instruction_result(1, 1),
             Instruction::OrR8(r8) => self.or_r8(r8, mmu),
             Instruction::OrImm8 => self.or_imm8(mmu),
@@ -508,6 +510,24 @@ impl CPU {
         self.instruction_result(3, 5)
     }
 
+    pub fn load_hl_sp_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let value = self.read_next_imm8_signed(mmu);
+        let (new_hl, half_carry, carry) = add_u16_i8(self.get_sp(), value);
+
+        self.set_hl(new_hl);
+        self.set_f_zero(false);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        self.instruction_result(2, 3)
+    }
+
+    pub fn load_sp_hl(&mut self) -> (u16, u8) {
+        self.set_sp(self.get_hl());
+        self.instruction_result(1, 2)
+    }
+
     pub fn jump_hl(&mut self) -> (u16, u8) {
         let new_pc = self.get_hl();
         (new_pc, 1)
@@ -789,7 +809,7 @@ impl CPU {
                 "PC(0x{:04X}) [0x{:02X}]: {}",
                 self.get_pc(),
                 instruction_byte,
-                instruction.parse_description(next_lsb, next_msb)
+                instruction.parse_clear_text(next_lsb, next_msb)
             );
         }
     }

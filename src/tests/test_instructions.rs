@@ -1214,6 +1214,32 @@ fn test_ld_imm16_a() {
     assert_eq!(mmu.read(0xCC33), 0x68);
 }
 
+/// LD HL, SP+e (0xF8)
+#[rstest]
+#[case::positive(0xFFDF, 16, 0xFFEF)]
+#[case::negative(0xFFDF, -16, 0xFFCF)]
+fn test_load_hl_sp_imm8(#[case] sp: u16, #[case] imm: i8, #[case] expected_hl: u16) {
+    let mut mmu = MMU::builder().rom(0, 0xF8).rom(1, imm as u8).build();
+    let mut cpu = CPU::builder().sp(sp).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 3);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(cpu.get_hl(), expected_hl);
+}
+
+/// LD SP, HL (0xF9)
+#[test]
+fn test_load_sp_hl() {
+    let mut mmu = MMU::builder().rom(0, 0xF9).build();
+    let mut cpu = CPU::builder().hl(0x1337).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 2);
+    assert_eq!(cpu.get_pc(), 1);
+    assert_eq!(cpu.get_sp(), 0x1337);
+}
+
 /// JUMP COND imm16
 #[rstest]
 #[case::nz_jump(0xC2, 0x34, 0x12, false, false, 0x1234, 4)]

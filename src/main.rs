@@ -19,7 +19,7 @@ fn main() {
     let cartridge = Cartridge::load(path).unwrap();
 
     let mut game_boy = GameBoy::initialize(&cartridge);
-    for _ in 0..67 {
+    for _ in 0..100 {
         game_boy.step();
     }
 
