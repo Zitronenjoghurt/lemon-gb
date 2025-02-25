@@ -8,7 +8,7 @@ use std::path::PathBuf;
 fn test_save_load() {
     setup_test_dir();
 
-    let test_rom_path = PathBuf::from("./test_roms/01-special.gb");
+    let test_rom_path = PathBuf::from("./test_roms/cpu_instrs.gb");
     let save_path_json = PathBuf::from("./test/test.json");
     let save_path_bin = PathBuf::from("./test/test.bin");
     let cartridge = Cartridge::load(test_rom_path).unwrap();

@@ -42,7 +42,7 @@ impl Timer {
         if div == 0 && (self.counter >> 8) != 0 {
             self.counter = 0;
         }
-        self.counter += cycles as u16 * 4;
+        self.counter = self.counter.wrapping_add(cycles as u16 * 4);
     }
 
     fn update_div(&self, mmu: &mut MMU) {

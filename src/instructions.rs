@@ -14,6 +14,8 @@ pub enum Instruction {
     AddCarryR8(R8),
     /// Add the next byte AND the current carry to register A
     AddCarryImm8,
+    /// Adds the next byte (signed) to the stack pointer
+    AddSpImm8,
     /// Register A will be set to the bitwise AND between the value register A and the value in the specified register
     AndR8(R8),
     /// Register A will be set to the bitwise AND between the value register A and the next byte
@@ -374,6 +376,7 @@ impl Instruction {
             0b1110_0010 => Ok(Instruction::LoadHighCA),            // 0xE2
             0b1110_0101 => Ok(Instruction::PushR16(R16Stack::HL)), // 0xE5
             0b1110_0110 => Ok(Instruction::AndImm8),               // 0xE6
+            0b1110_1000 => Ok(Instruction::AddSpImm8),             // 0xE8
             0b1110_1001 => Ok(Instruction::JpHL),                  // 0xE9
             0b1110_1010 => Ok(Instruction::LoadImm16A),            // 0xEA
             0b1110_1110 => Ok(Instruction::XorImm8),               // 0xEE
@@ -446,7 +449,8 @@ impl Instruction {
             | Self::SubCarryImm8
             | Self::XorImm8
             | Self::LoadHighAImm8
-            | Self::LoadHighImm8A => 2,
+            | Self::LoadHighImm8A
+            | Self::AddSpImm8 => 2,
             Self::JpImm16
             | Self::JpCondImm16(_)
             | Self::LoadR16Imm16(_)
@@ -501,6 +505,7 @@ impl Instruction {
             Self::AddImm8 => format!("ADD A, 0x{:02X}", lsb),
             Self::AddCarryR8(r8) => format!("ADC A, {r8}"),
             Self::AddCarryImm8 => format!("ADC A, 0x{:02X}", lsb),
+            Self::AddSpImm8 => format!("ADD SP, 0x{:02X}", lsb as i8),
             Self::AndR8(r8) => format!("AND A, {r8}"),
             Self::AndImm8 => format!("AND A, 0x{:02X}", lsb),
             Self::CompareR8(r8) => format!("CP A, {r8}"),
@@ -564,6 +569,7 @@ impl Instruction {
                 format!("Add value from register {r8} (and the current carry) to register A")
             }
             Self::AddCarryImm8 => format!("Add 0x{:02X} (and the current carry) to register A", lsb),
+            Self::AddSpImm8 => format!("Add 0x{:02X} to the stack pointer", lsb as i8),
             Self::AndR8(r8) => format!("Bitwise AND value in register {r8} to register A"),
             Self::AndImm8 => format!("Bitwise AND 0x{:02X} to register A", lsb),
             Self::CompareR8(r8) => format!("Subtract value in register {r8} from register A but discard the result (comparison)"),

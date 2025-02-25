@@ -74,6 +74,24 @@ pub fn add_u16(a: u16, b: u16) -> (u16, bool, bool) {
     (result, h_carry, carry)
 }
 
+/// Adds the signed byte b to the two byte unsigned a returning (result, half_carry, carry)
+/// half_carry and carry are based on the lower 8 bits only
+pub fn add_u16_i8(a: u16, b: i8) -> (u16, bool, bool) {
+    let result = a.wrapping_add(b as i16 as u16);
+
+    // For flag calculation, treat as 8-bit addition of lower byte of SP and the immediate
+    let lower_a = (a & 0xFF) as u8;
+    let b_u8 = b as u8; // Preserves two's complement for negative values
+
+    // Half-carry occurs if there's a carry from bit 3
+    let h_carry = (lower_a & 0x0F) + (b_u8 & 0x0F) > 0x0F;
+
+    // Carry occurs if there's a carry from bit 7
+    let carry = lower_a.overflowing_add(b_u8).1;
+
+    (result, h_carry, carry)
+}
+
 /// Subtracts b from a and returns (result, half_carry, carry)
 pub fn sub_u8(a: u8, b: u8) -> (u8, bool, bool) {
     let (result, carry) = a.overflowing_sub(b);

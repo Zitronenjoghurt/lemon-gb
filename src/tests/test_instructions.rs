@@ -404,6 +404,22 @@ fn test_add_hl_r16(
     assert!(cpu.get_f_zero());
 }
 
+/// ADD SP imm8 (0xE8)
+#[rstest]
+#[case::negative(0xFFFE, -1, 0xFFFD)]
+#[case::negative(0xFFFE, -16, 0xFFEE)]
+#[case::positive(0xFFFE, 1, 0xFFFF)]
+#[case::positive(0xFFEF, 16, 0xFFFF)]
+fn test_add_sp_imm8(#[case] value_sp: u16, #[case] imm: i8, #[case] expected_sp: u16) {
+    let mut mmu = MMU::builder().rom(0, 0xE8).rom(1, imm as u8).build();
+    let mut cpu = CPU::builder().sp(value_sp).build();
+    let m = cpu.step(&mut mmu);
+
+    assert_eq!(m, 4);
+    assert_eq!(cpu.get_pc(), 2);
+    assert_eq!(cpu.get_sp(), expected_sp);
+}
+
 /// AND r8
 #[rstest]
 #[case::b_nz(0xA0, 0b0101_1011, 0b0100_0101, R8::B, 0b0100_0001, false)]
@@ -1256,24 +1272,33 @@ fn test_jr_imm8() {
 
 /// JR cond imm8
 #[rstest]
-#[case::nz_jump(0x20, 30, 32, 3, false, false)]
-#[case::nz_no_jump(0x20, 30, 2, 2, true, false)]
-#[case::z_jump(0x28, 30, 32, 3, true, false)]
-#[case::z_no_jump(0x28, 30, 2, 2, false, false)]
-#[case::nc_jump(0x30, 30, 32, 3, false, false)]
-#[case::nc_no_jump(0x30, 30, 2, 2, false, true)]
-#[case::c_jump(0x38, 30, 32, 3, false, true)]
-#[case::c_no_jump(0x38, 30, 2, 2, false, false)]
+#[case::nz_jump(0x20, 30, 0, 32, 3, false, false)]
+#[case::nz_no_jump(0x20, 30, 0, 2, 2, true, false)]
+#[case::z_jump(0x28, 30, 0, 32, 3, true, false)]
+#[case::z_no_jump(0x28, 30, 0, 2, 2, false, false)]
+#[case::nc_jump(0x30, 30, 0, 32, 3, false, false)]
+#[case::nc_no_jump(0x30, 30, 0, 2, 2, false, true)]
+#[case::c_jump(0x38, 30, 0, 32, 3, false, true)]
+#[case::c_no_jump(0x38, 30, 0, 2, 2, false, false)]
+#[case::jump_negative(0x38, -30, 32, 4, 3, false, true)]
 fn test_jr_cond_imm8(
     #[case] opcode: u8,
-    #[case] immediate: u8,
+    #[case] immediate: i8,
+    #[case] pc: u16,
     #[case] target_pc: u16,
     #[case] target_m: u8,
     #[case] zero_flag: bool,
     #[case] carry_flag: bool,
 ) {
-    let mut mmu = MMU::builder().rom(0, opcode).rom(1, immediate).build();
-    let mut cpu = CPU::builder().f_zero(zero_flag).f_carry(carry_flag).build();
+    let mut mmu = MMU::builder()
+        .rom(pc, opcode)
+        .rom(pc + 1, immediate as u8)
+        .build();
+    let mut cpu = CPU::builder()
+        .pc(pc)
+        .f_zero(zero_flag)
+        .f_carry(carry_flag)
+        .build();
     let m = cpu.step(&mut mmu);
 
     assert_eq!(m, target_m);

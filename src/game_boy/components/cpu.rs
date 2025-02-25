@@ -49,6 +49,7 @@ impl CPU {
             Instruction::AddImm8 => self.add_imm8(mmu),
             Instruction::AddCarryR8(r8) => self.add_carry_r8(r8, mmu),
             Instruction::AddCarryImm8 => self.add_carry_imm8(mmu),
+            Instruction::AddSpImm8 => self.add_sp_imm8(mmu),
             Instruction::AndR8(r8) => self.and_r8(r8, mmu),
             Instruction::AndImm8 => self.and_imm8(mmu),
             Instruction::CompareR8(r8) => self.compare_r8(r8, mmu),
@@ -289,6 +290,18 @@ impl CPU {
         self.instruction_result(2, 2)
     }
 
+    pub fn add_sp_imm8(&mut self, mmu: &MMU) -> (u16, u8) {
+        let value = self.read_next_imm8_signed(mmu);
+        let (result, half_carry, carry) = add_u16_i8(self.get_sp(), value);
+        self.set_sp(result);
+        self.set_f_zero(false);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(half_carry);
+        self.set_f_carry(carry);
+
+        self.instruction_result(2, 4)
+    }
+
     pub fn compare_r8(&mut self, r8: R8, mmu: &MMU) -> (u16, u8) {
         let source_value = self.get_r8(r8, mmu);
         let (ignored_result, half_carry, carry) = sub_u8(self.get_a(), source_value);
@@ -516,8 +529,10 @@ impl CPU {
     }
 
     pub fn jump_relative_imm8(&self, mmu: &MMU) -> (u16, u8) {
-        let value = self.read_next_imm8(mmu) as u16;
-        self.instruction_result(value + 2, 3)
+        let value = self.read_next_imm8_signed(mmu);
+        let (new_pc, _, _) = add_u16_i8(self.get_pc(), value);
+        let new_pc = new_pc.wrapping_add(2); // The pc increments that occurred due to this instruction
+        (new_pc, 3)
     }
 
     pub fn jump_relative_condition_imm8(&self, condition: JumpCondition, mmu: &MMU) -> (u16, u8) {
@@ -738,6 +753,10 @@ impl CPU {
 
     fn read_next_imm8(&self, mmu: &MMU) -> u8 {
         mmu.read(self.get_pc().wrapping_add(1))
+    }
+
+    fn read_next_imm8_signed(&self, mmu: &MMU) -> i8 {
+        mmu.read(self.get_pc().wrapping_add(1)) as i8
     }
 
     fn read_next_imm16(&self, mmu: &MMU) -> u16 {
