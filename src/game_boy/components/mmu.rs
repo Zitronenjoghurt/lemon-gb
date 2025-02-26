@@ -62,13 +62,26 @@ const INITIAL_WY: u8 = 0x00;
 const INITIAL_WX: u8 = 0x00;
 const INITIAL_IE: u8 = 0x00;
 
-// Important addresses
+// IMPORTANT ADDRESSES
+// Timer
 pub const DIV_ADDRESS: u16 = 0xFF04;
 pub const TIMA_ADDRESS: u16 = 0xFF05;
 pub const TMA_ADDRESS: u16 = 0xFF06;
 pub const TAC_ADDRESS: u16 = 0xFF07;
+
+// Interrupts
 pub const IF_ADDRESS: u16 = 0xFF0F;
 pub const IE_ADDRESS: u16 = 0xFFFF;
+
+// Graphics
+pub const LCDC_ADDRESS: u16 = 0xFF40;
+pub const STAT_ADDRESS: u16 = 0xFF41;
+pub const SCY_ADDRESS: u16 = 0xFF42;
+pub const SCX_ADDRESS: u16 = 0xFF43;
+pub const LY_ADDRESS: u16 = 0xFF44;
+pub const LYC_ADDRESS: u16 = 0xFF45;
+pub const DMA_ADDRESS: u16 = 0xFF46;
+pub const BGP_ADDRESS: u16 = 0xFF47; // Background color palette
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MMU {

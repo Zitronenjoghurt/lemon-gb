@@ -31,7 +31,7 @@ WORK IN PROGRESS, not launchable yet
 - ✅ CPU (501/501 Instructions, except STOP)
 - ✅ Timer
 - 🚧 MMU (see memory banking)
-- ❌ PPU
+- 🚧 PPU
 - ❌ APU
 
 ### Memory Banking

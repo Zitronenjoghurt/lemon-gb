@@ -13,9 +13,10 @@ fn test_save_load() {
     let save_path_bin = PathBuf::from("./test/test.bin");
     let cartridge = Cartridge::load(test_rom_path).unwrap();
 
-    let mut game_boy = GameBoy::initialize(&cartridge);
-    game_boy.step();
-    game_boy.step();
+    let game_boy = GameBoy::initialize(&cartridge);
+    // ToDo: Step Game Boy (when PPU is implemented in save/loading)
+    // game_boy.step();
+    // game_boy.step();
 
     let save_state = game_boy.save();
     save_state.store_json(&save_path_json).unwrap();
