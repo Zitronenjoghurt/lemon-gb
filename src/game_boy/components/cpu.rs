@@ -98,8 +98,8 @@ impl CPU {
             Instruction::ReturnEnableInterrupts => self.return_from_func_enable_interrupts(mmu),
             Instruction::RotateLeftA => self.rotate_left_a(),
             Instruction::RotateRightA => self.rotate_right_a(),
-            Instruction::RotateLeftCarryA => self.rotate_left_carry_a(),
-            Instruction::RotateRightCarryA => self.rotate_right_carry_a(),
+            Instruction::RotateLeftCircularA => self.rotate_left_circular_a(),
+            Instruction::RotateRightCircularA => self.rotate_right_circular_a(),
             Instruction::SetCarryFlag => self.set_carry_flag(),
             Instruction::SubR8(r8) => self.sub_r8(r8, mmu),
             Instruction::SubImm8 => self.sub_imm8(mmu),
@@ -107,6 +107,17 @@ impl CPU {
             Instruction::SubCarryImm8 => self.sub_carry_imm8(mmu),
             Instruction::XorR8(r8) => self.xor_r8(r8, mmu),
             Instruction::XorImm8 => self.xor_imm8(mmu),
+            Instruction::BitCheckR8((index, r8)) => self.bit_check_r8(index, r8, mmu),
+            Instruction::BitResetR8((index, r8)) => self.bit_reset_r8(index, r8, mmu),
+            Instruction::BitSetR8((index, r8)) => self.bit_set_r8(index, r8, mmu),
+            Instruction::RotateLeftR8(r8) => self.rotate_left_r8(r8, mmu),
+            Instruction::RotateLeftCircularR8(r8) => self.rotate_left_circular_r8(r8, mmu),
+            Instruction::RotateRightR8(r8) => self.rotate_right_r8(r8, mmu),
+            Instruction::RotateRightCircularR8(r8) => self.rotate_right_circular_r8(r8, mmu),
+            Instruction::ShiftLeftR8(r8) => self.shift_left_r8(r8, mmu),
+            Instruction::ShiftRightR8(r8) => self.shift_right_arithmetical_r8(r8, mmu),
+            Instruction::ShiftRightLogicallyR8(r8) => self.shift_right_logical_r8(r8, mmu),
+            Instruction::SwapR8(r8) => self.swap_r8(r8, mmu),
         }
     }
 
@@ -307,6 +318,32 @@ impl CPU {
         self.instruction_result(2, 4)
     }
 
+    pub fn bit_check_r8(&mut self, bit_index: usize, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        self.set_f_zero(!get_bit_u8(value, bit_index));
+        self.set_f_subtract(false);
+        self.set_f_half_carry(true);
+
+        let m = if register == R8::HL { 3 } else { 2 };
+        self.instruction_result(2, m)
+    }
+
+    pub fn bit_reset_r8(&mut self, bit_index: usize, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let new_value = set_bit_u8(value, bit_index, false);
+        self.set_r8(register, new_value, mmu);
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
+    }
+
+    pub fn bit_set_r8(&mut self, bit_index: usize, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let new_value = set_bit_u8(value, bit_index, true);
+        self.set_r8(register, new_value, mmu);
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
+    }
+
     pub fn call(&mut self, mmu: &mut MMU) -> (u16, u8) {
         let func_address = self.read_next_imm16(mmu);
         self.push_u16(self.get_pc(), mmu);
@@ -396,7 +433,14 @@ impl CPU {
     }
 
     pub fn decrement_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
-        self.set_r8(r8, self.get_r8(r8, mmu).wrapping_sub(1), mmu);
+        let value = self.get_r8(r8, mmu);
+        let (new_value, half_carry, _) = sub_u8(value, 1);
+
+        self.set_r8(r8, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(true);
+        self.set_f_half_carry(half_carry);
+
         let m = if r8 == R8::HL { 3 } else { 1 };
         self.instruction_result(1, m)
     }
@@ -423,7 +467,14 @@ impl CPU {
     }
 
     pub fn increment_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
-        self.set_r8(r8, self.get_r8(r8, mmu).wrapping_add(1), mmu);
+        let value = self.get_r8(r8, mmu);
+        let (new_value, half_carry, _) = add_u8(value, 1);
+
+        self.set_r8(r8, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(half_carry);
+
         let m = if r8 == R8::HL { 3 } else { 1 };
         self.instruction_result(1, m)
     }
@@ -655,22 +706,78 @@ impl CPU {
         self.instruction_result(1, 1)
     }
 
+    pub fn rotate_left_r8(&mut self, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let (new_value, new_carry) = rotate_left_through_carry_u8(value, self.get_f_carry());
+
+        self.set_r8(register, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(new_carry);
+
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
+    }
+
     pub fn rotate_right_a(&mut self) -> (u16, u8) {
         let (new_a, new_carry) = rotate_right_through_carry_u8(self.get_a(), self.get_f_carry());
         self.update_a_and_flags_after_rotation(new_a, new_carry);
         self.instruction_result(1, 1)
     }
 
-    pub fn rotate_left_carry_a(&mut self) -> (u16, u8) {
+    pub fn rotate_right_r8(&mut self, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let (new_value, new_carry) = rotate_right_through_carry_u8(value, self.get_f_carry());
+
+        self.set_r8(register, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(new_carry);
+
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
+    }
+
+    pub fn rotate_left_circular_a(&mut self) -> (u16, u8) {
         let (new_a, new_carry) = rotate_left_get_carry_u8(self.get_a());
         self.update_a_and_flags_after_rotation(new_a, new_carry);
         self.instruction_result(1, 1)
     }
 
-    pub fn rotate_right_carry_a(&mut self) -> (u16, u8) {
+    pub fn rotate_left_circular_r8(&mut self, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let (new_value, new_carry) = rotate_left_get_carry_u8(value);
+
+        self.set_r8(register, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(new_carry);
+
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
+    }
+
+    pub fn rotate_right_circular_a(&mut self) -> (u16, u8) {
         let (new_a, new_carry) = rotate_right_get_carry_u8(self.get_a());
         self.update_a_and_flags_after_rotation(new_a, new_carry);
         self.instruction_result(1, 1)
+    }
+
+    pub fn rotate_right_circular_r8(&mut self, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let (new_value, new_carry) = rotate_right_get_carry_u8(value);
+
+        self.set_r8(register, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(new_carry);
+
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
     }
 
     pub fn set_carry_flag(&mut self) -> (u16, u8) {
@@ -678,6 +785,52 @@ impl CPU {
         self.set_f_subtract(false);
         self.set_f_half_carry(false);
         self.instruction_result(1, 1)
+    }
+
+    pub fn shift_left_r8(&mut self, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let new_carry = get_bit_u8(value, 7);
+        let new_value = value << 1;
+
+        self.set_r8(register, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(new_carry);
+
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
+    }
+
+    pub fn shift_right_arithmetical_r8(&mut self, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let new_carry = get_bit_u8(value, 0);
+        // Shift right while persisting the leftmost bit, this is important for signed values
+        let new_value = set_bit_u8(value >> 1, 7, get_bit_u8(value, 7));
+
+        self.set_r8(register, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(new_carry);
+
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
+    }
+
+    pub fn shift_right_logical_r8(&mut self, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let new_carry = get_bit_u8(value, 0);
+        let new_value = value >> 1; // Shift right while filling up with 0's
+
+        self.set_r8(register, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(new_carry);
+
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
     }
 
     pub fn sub_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {
@@ -734,6 +887,20 @@ impl CPU {
         self.set_f_carry(carry);
 
         self.instruction_result(2, 2)
+    }
+
+    pub fn swap_r8(&mut self, register: R8, mmu: &mut MMU) -> (u16, u8) {
+        let value = self.get_r8(register, mmu);
+        let new_value = (value >> 4) | (value << 4);
+
+        self.set_r8(register, new_value, mmu);
+        self.set_f_zero(new_value == 0);
+        self.set_f_subtract(false);
+        self.set_f_half_carry(false);
+        self.set_f_carry(false);
+
+        let m = if register == R8::HL { 4 } else { 2 };
+        self.instruction_result(2, m)
     }
 
     pub fn xor_r8(&mut self, r8: R8, mmu: &mut MMU) -> (u16, u8) {

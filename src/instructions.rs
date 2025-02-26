@@ -135,7 +135,7 @@ pub enum Instruction {
     /// ┗━━━━━━━━━┛ │ ┗━━━━━━━━━━━━━━━━━┛ │
     ///             └─────────────────────┘
     /// ```
-    RotateLeftCarryA,
+    RotateLeftCircularA,
     /// Rotate register A right by 1 bit
     /// ```
     ///   ┏━━━━━━━ A ━━━━━━━┓   ┏━ Flags ━┓
@@ -143,7 +143,7 @@ pub enum Instruction {
     /// │ ┗━━━━━━━━━━━━━━━━━┛ │ ┗━━━━━━━━━┛
     /// └─────────────────────┘
     /// ```
-    RotateRightCarryA,
+    RotateRightCircularA,
     /// Sets the carry flag to 1
     SetCarryFlag,
     /// Subtract the value in the specified register from register A
@@ -158,12 +158,35 @@ pub enum Instruction {
     XorR8(R8),
     /// Register A will be set to the bitwise XOR between the value register A and the next byte
     XorImm8,
+    // Prefixed instructions
+    /// Test bit at specified index in the specified register, if its 0, set the zero flag
+    BitCheckR8((usize, R8)),
+    /// Reset bit at specified index in the specified register
+    BitResetR8((usize, R8)),
+    /// Set bit at specified index in the specified register
+    BitSetR8((usize, R8)),
+    /// Rotate the specified register left THROUGH the carry flag
+    RotateLeftR8(R8),
+    /// Rotate the specified register left
+    RotateLeftCircularR8(R8),
+    /// Rotate the specified register right THROUGH the carry flag
+    RotateRightR8(R8),
+    /// Rotate the specified register right
+    RotateRightCircularR8(R8),
+    /// Shift the specified register to the left (filling up with 0's)
+    ShiftLeftR8(R8),
+    /// Shift the specified register to the right (leftmost bit stays unchanged)
+    ShiftRightR8(R8),
+    /// Swap upper and lower 4 bits of the specified register
+    SwapR8(R8),
+    /// Shift the specified register to the right (filling up with 0's)
+    ShiftRightLogicallyR8(R8),
 }
 
 impl Instruction {
     pub fn from_byte(byte: u8, prefixed: bool) -> Result<Self, Box<dyn Error>> {
         if prefixed {
-            Self::from_byte_prefixed(byte)
+            Ok(Self::from_byte_prefixed(byte))
         } else {
             Self::from_byte_unprefixed(byte)
         }
@@ -178,7 +201,7 @@ impl Instruction {
             0b0000_0100 => Ok(Self::IncR8(R8::B)),                        // 0x04
             0b0000_0101 => Ok(Self::DecR8(R8::B)),                        // 0x05
             0b0000_0110 => Ok(Self::LoadR8Imm8(R8::B)),                   // 0x06
-            0b0000_0111 => Ok(Self::RotateLeftCarryA),                    // 0x07
+            0b0000_0111 => Ok(Self::RotateLeftCircularA),                 // 0x07
             0b0000_1000 => Ok(Self::LoadImm16SP),                         // 0x08
             0b0000_1001 => Ok(Self::AddHLR16(R16::BC)),                   // 0x09
             0b0000_1010 => Ok(Self::LoadAR16(R16Mem::BC)),                // 0x0A
@@ -186,7 +209,8 @@ impl Instruction {
             0b0000_1100 => Ok(Self::IncR8(R8::C)),                        // 0x0C
             0b0000_1101 => Ok(Self::DecR8(R8::C)),                        // 0x0D
             0b0000_1110 => Ok(Self::LoadR8Imm8(R8::C)),                   // 0x0E
-            0b0000_1111 => Ok(Self::RotateRightCarryA),                   // 0x0F
+            0b0000_1111 => Ok(Self::RotateRightCircularA),                // 0x0F
+            0b0001_0000 => Ok(Self::Halt),                                // 0x10 ToDo: STOP
             0b0001_0001 => Ok(Self::LoadR16Imm16(R16::DE)),               // 0x11
             0b0001_0010 => Ok(Self::LoadR16A(R16Mem::DE)),                // 0x12
             0b0001_0011 => Ok(Self::IncR16(R16::DE)),                     // 0x13
@@ -418,9 +442,266 @@ impl Instruction {
         }
     }
 
-    pub fn from_byte_prefixed(byte: u8) -> Result<Self, Box<dyn Error>> {
+    #[allow(unreachable_patterns)]
+    pub fn from_byte_prefixed(byte: u8) -> Self {
         match byte {
-            _ => Ok(Self::Nop),
+            0b0000_0000 => Self::RotateLeftCircularR8(R8::B), // 0x00
+            0b0000_0001 => Self::RotateLeftCircularR8(R8::C), // 0x01
+            0b0000_0010 => Self::RotateLeftCircularR8(R8::D), // 0x02
+            0b0000_0011 => Self::RotateLeftCircularR8(R8::E), // 0x03
+            0b0000_0100 => Self::RotateLeftCircularR8(R8::H), // 0x04
+            0b0000_0101 => Self::RotateLeftCircularR8(R8::L), // 0x05
+            0b0000_0110 => Self::RotateLeftCircularR8(R8::HL), // 0x06
+            0b0000_0111 => Self::RotateLeftCircularR8(R8::A), // 0x07
+            0b0000_1000 => Self::RotateRightCircularR8(R8::B), // 0x08
+            0b0000_1001 => Self::RotateRightCircularR8(R8::C), // 0x09
+            0b0000_1010 => Self::RotateRightCircularR8(R8::D), // 0x0A
+            0b0000_1011 => Self::RotateRightCircularR8(R8::E), // 0x0B
+            0b0000_1100 => Self::RotateRightCircularR8(R8::H), // 0x0C
+            0b0000_1101 => Self::RotateRightCircularR8(R8::L), // 0x0D
+            0b0000_1110 => Self::RotateRightCircularR8(R8::HL), // 0x0E
+            0b0000_1111 => Self::RotateRightCircularR8(R8::A), // 0x0F
+            0b0001_0000 => Self::RotateLeftR8(R8::B),         // 0x10
+            0b0001_0001 => Self::RotateLeftR8(R8::C),         // 0x11
+            0b0001_0010 => Self::RotateLeftR8(R8::D),         // 0x12
+            0b0001_0011 => Self::RotateLeftR8(R8::E),         // 0x13
+            0b0001_0100 => Self::RotateLeftR8(R8::H),         // 0x14
+            0b0001_0101 => Self::RotateLeftR8(R8::L),         // 0x15
+            0b0001_0110 => Self::RotateLeftR8(R8::HL),        // 0x16
+            0b0001_0111 => Self::RotateLeftR8(R8::A),         // 0x17
+            0b0001_1000 => Self::RotateRightR8(R8::B),        // 0x18
+            0b0001_1001 => Self::RotateRightR8(R8::C),        // 0x19
+            0b0001_1010 => Self::RotateRightR8(R8::D),        // 0x1A
+            0b0001_1011 => Self::RotateRightR8(R8::E),        // 0x1B
+            0b0001_1100 => Self::RotateRightR8(R8::H),        // 0x1C
+            0b0001_1101 => Self::RotateRightR8(R8::L),        // 0x1D
+            0b0001_1110 => Self::RotateRightR8(R8::HL),       // 0x1E
+            0b0001_1111 => Self::RotateRightR8(R8::A),        // 0x1F
+            0b0010_0000 => Self::ShiftLeftR8(R8::B),          // 0x20
+            0b0010_0001 => Self::ShiftLeftR8(R8::C),          // 0x21
+            0b0010_0010 => Self::ShiftLeftR8(R8::D),          // 0x22
+            0b0010_0011 => Self::ShiftLeftR8(R8::E),          // 0x23
+            0b0010_0100 => Self::ShiftLeftR8(R8::H),          // 0x24
+            0b0010_0101 => Self::ShiftLeftR8(R8::L),          // 0x25
+            0b0010_0110 => Self::ShiftLeftR8(R8::HL),         // 0x26
+            0b0010_0111 => Self::ShiftLeftR8(R8::A),          // 0x27
+            0b0010_1000 => Self::ShiftRightR8(R8::B),         // 0x28
+            0b0010_1001 => Self::ShiftRightR8(R8::C),         // 0x29
+            0b0010_1010 => Self::ShiftRightR8(R8::D),         // 0x2A
+            0b0010_1011 => Self::ShiftRightR8(R8::E),         // 0x2B
+            0b0010_1100 => Self::ShiftRightR8(R8::H),         // 0x2C
+            0b0010_1101 => Self::ShiftRightR8(R8::L),         // 0x2D
+            0b0010_1110 => Self::ShiftRightR8(R8::HL),        // 0x2E
+            0b0010_1111 => Self::ShiftRightR8(R8::A),         // 0x2F
+            0b0011_0000 => Self::SwapR8(R8::B),               // 0x30
+            0b0011_0001 => Self::SwapR8(R8::C),               // 0x31
+            0b0011_0010 => Self::SwapR8(R8::D),               // 0x32
+            0b0011_0011 => Self::SwapR8(R8::E),               // 0x33
+            0b0011_0100 => Self::SwapR8(R8::H),               // 0x34
+            0b0011_0101 => Self::SwapR8(R8::L),               // 0x35
+            0b0011_0110 => Self::SwapR8(R8::HL),              // 0x36
+            0b0011_0111 => Self::SwapR8(R8::A),               // 0x37
+            0b0011_1000 => Self::ShiftRightLogicallyR8(R8::B), // 0x38
+            0b0011_1001 => Self::ShiftRightLogicallyR8(R8::C), // 0x39
+            0b0011_1010 => Self::ShiftRightLogicallyR8(R8::D), // 0x3A
+            0b0011_1011 => Self::ShiftRightLogicallyR8(R8::E), // 0x3B
+            0b0011_1100 => Self::ShiftRightLogicallyR8(R8::H), // 0x3C
+            0b0011_1101 => Self::ShiftRightLogicallyR8(R8::L), // 0x3D
+            0b0011_1110 => Self::ShiftRightLogicallyR8(R8::HL), // 0x3E
+            0b0011_1111 => Self::ShiftRightLogicallyR8(R8::A), // 0x3F
+            0b0100_0000 => Self::BitCheckR8((0, R8::B)),      // 0x40
+            0b0100_0001 => Self::BitCheckR8((0, R8::C)),      // 0x41
+            0b0100_0010 => Self::BitCheckR8((0, R8::D)),      // 0x42
+            0b0100_0011 => Self::BitCheckR8((0, R8::E)),      // 0x43
+            0b0100_0100 => Self::BitCheckR8((0, R8::H)),      // 0x44
+            0b0100_0101 => Self::BitCheckR8((0, R8::L)),      // 0x45
+            0b0100_0110 => Self::BitCheckR8((0, R8::HL)),     // 0x46
+            0b0100_0111 => Self::BitCheckR8((0, R8::A)),      // 0x47
+            0b0100_1000 => Self::BitCheckR8((1, R8::B)),      // 0x48
+            0b0100_1001 => Self::BitCheckR8((1, R8::C)),      // 0x49
+            0b0100_1010 => Self::BitCheckR8((1, R8::D)),      // 0x4A
+            0b0100_1011 => Self::BitCheckR8((1, R8::E)),      // 0x4B
+            0b0100_1100 => Self::BitCheckR8((1, R8::H)),      // 0x4C
+            0b0100_1101 => Self::BitCheckR8((1, R8::L)),      // 0x4D
+            0b0100_1110 => Self::BitCheckR8((1, R8::HL)),     // 0x4E
+            0b0100_1111 => Self::BitCheckR8((1, R8::A)),      // 0x4F
+            0b0101_0000 => Self::BitCheckR8((2, R8::B)),      // 0x50
+            0b0101_0001 => Self::BitCheckR8((2, R8::C)),      // 0x51
+            0b0101_0010 => Self::BitCheckR8((2, R8::D)),      // 0x52
+            0b0101_0011 => Self::BitCheckR8((2, R8::E)),      // 0x53
+            0b0101_0100 => Self::BitCheckR8((2, R8::H)),      // 0x54
+            0b0101_0101 => Self::BitCheckR8((2, R8::L)),      // 0x55
+            0b0101_0110 => Self::BitCheckR8((2, R8::HL)),     // 0x56
+            0b0101_0111 => Self::BitCheckR8((2, R8::A)),      // 0x57
+            0b0101_1000 => Self::BitCheckR8((3, R8::B)),      // 0x58
+            0b0101_1001 => Self::BitCheckR8((3, R8::C)),      // 0x59
+            0b0101_1010 => Self::BitCheckR8((3, R8::D)),      // 0x5A
+            0b0101_1011 => Self::BitCheckR8((3, R8::E)),      // 0x5B
+            0b0101_1100 => Self::BitCheckR8((3, R8::H)),      // 0x5C
+            0b0101_1101 => Self::BitCheckR8((3, R8::L)),      // 0x5D
+            0b0101_1110 => Self::BitCheckR8((3, R8::HL)),     // 0x5E
+            0b0101_1111 => Self::BitCheckR8((3, R8::A)),      // 0x5F
+            0b0110_0000 => Self::BitCheckR8((4, R8::B)),      // 0x60
+            0b0110_0001 => Self::BitCheckR8((4, R8::C)),      // 0x61
+            0b0110_0010 => Self::BitCheckR8((4, R8::D)),      // 0x62
+            0b0110_0011 => Self::BitCheckR8((4, R8::E)),      // 0x63
+            0b0110_0100 => Self::BitCheckR8((4, R8::H)),      // 0x64
+            0b0110_0101 => Self::BitCheckR8((4, R8::L)),      // 0x65
+            0b0110_0110 => Self::BitCheckR8((4, R8::HL)),     // 0x66
+            0b0110_0111 => Self::BitCheckR8((4, R8::A)),      // 0x67
+            0b0110_1000 => Self::BitCheckR8((5, R8::B)),      // 0x68
+            0b0110_1001 => Self::BitCheckR8((5, R8::C)),      // 0x69
+            0b0110_1010 => Self::BitCheckR8((5, R8::D)),      // 0x6A
+            0b0110_1011 => Self::BitCheckR8((5, R8::E)),      // 0x6B
+            0b0110_1100 => Self::BitCheckR8((5, R8::H)),      // 0x6C
+            0b0110_1101 => Self::BitCheckR8((5, R8::L)),      // 0x6D
+            0b0110_1110 => Self::BitCheckR8((5, R8::HL)),     // 0x6E
+            0b0110_1111 => Self::BitCheckR8((5, R8::A)),      // 0x6F
+            0b0111_0000 => Self::BitCheckR8((6, R8::B)),      // 0x70
+            0b0111_0001 => Self::BitCheckR8((6, R8::C)),      // 0x71
+            0b0111_0010 => Self::BitCheckR8((6, R8::D)),      // 0x72
+            0b0111_0011 => Self::BitCheckR8((6, R8::E)),      // 0x73
+            0b0111_0100 => Self::BitCheckR8((6, R8::H)),      // 0x74
+            0b0111_0101 => Self::BitCheckR8((6, R8::L)),      // 0x75
+            0b0111_0110 => Self::BitCheckR8((6, R8::HL)),     // 0x76
+            0b0111_0111 => Self::BitCheckR8((6, R8::A)),      // 0x77
+            0b0111_1000 => Self::BitCheckR8((7, R8::B)),      // 0x78
+            0b0111_1001 => Self::BitCheckR8((7, R8::C)),      // 0x79
+            0b0111_1010 => Self::BitCheckR8((7, R8::D)),      // 0x7A
+            0b0111_1011 => Self::BitCheckR8((7, R8::E)),      // 0x7B
+            0b0111_1100 => Self::BitCheckR8((7, R8::H)),      // 0x7C
+            0b0111_1101 => Self::BitCheckR8((7, R8::L)),      // 0x7D
+            0b0111_1110 => Self::BitCheckR8((7, R8::HL)),     // 0x7E
+            0b0111_1111 => Self::BitCheckR8((7, R8::A)),      // 0x7F
+            0b1000_0000 => Self::BitResetR8((0, R8::B)),      // 0x80
+            0b1000_0001 => Self::BitResetR8((0, R8::C)),      // 0x81
+            0b1000_0010 => Self::BitResetR8((0, R8::D)),      // 0x82
+            0b1000_0011 => Self::BitResetR8((0, R8::E)),      // 0x83
+            0b1000_0100 => Self::BitResetR8((0, R8::H)),      // 0x84
+            0b1000_0101 => Self::BitResetR8((0, R8::L)),      // 0x85
+            0b1000_0110 => Self::BitResetR8((0, R8::HL)),     // 0x86
+            0b1000_0111 => Self::BitResetR8((0, R8::A)),      // 0x87
+            0b1000_1000 => Self::BitResetR8((1, R8::B)),      // 0x88
+            0b1000_1001 => Self::BitResetR8((1, R8::C)),      // 0x89
+            0b1000_1010 => Self::BitResetR8((1, R8::D)),      // 0x8A
+            0b1000_1011 => Self::BitResetR8((1, R8::E)),      // 0x8B
+            0b1000_1100 => Self::BitResetR8((1, R8::H)),      // 0x8C
+            0b1000_1101 => Self::BitResetR8((1, R8::L)),      // 0x8D
+            0b1000_1110 => Self::BitResetR8((1, R8::HL)),     // 0x8E
+            0b1000_1111 => Self::BitResetR8((1, R8::A)),      // 0x8F
+            0b1001_0000 => Self::BitResetR8((2, R8::B)),      // 0x90
+            0b1001_0001 => Self::BitResetR8((2, R8::C)),      // 0x91
+            0b1001_0010 => Self::BitResetR8((2, R8::D)),      // 0x92
+            0b1001_0011 => Self::BitResetR8((2, R8::E)),      // 0x93
+            0b1001_0100 => Self::BitResetR8((2, R8::H)),      // 0x94
+            0b1001_0101 => Self::BitResetR8((2, R8::L)),      // 0x95
+            0b1001_0110 => Self::BitResetR8((2, R8::HL)),     // 0x96
+            0b1001_0111 => Self::BitResetR8((2, R8::A)),      // 0x97
+            0b1001_1000 => Self::BitResetR8((3, R8::B)),      // 0x98
+            0b1001_1001 => Self::BitResetR8((3, R8::C)),      // 0x99
+            0b1001_1010 => Self::BitResetR8((3, R8::D)),      // 0x9A
+            0b1001_1011 => Self::BitResetR8((3, R8::E)),      // 0x9B
+            0b1001_1100 => Self::BitResetR8((3, R8::H)),      // 0x9C
+            0b1001_1101 => Self::BitResetR8((3, R8::L)),      // 0x9D
+            0b1001_1110 => Self::BitResetR8((3, R8::HL)),     // 0x9E
+            0b1001_1111 => Self::BitResetR8((3, R8::A)),      // 0x9F
+            0b1010_0000 => Self::BitResetR8((4, R8::B)),      // 0xA0
+            0b1010_0001 => Self::BitResetR8((4, R8::C)),      // 0xA1
+            0b1010_0010 => Self::BitResetR8((4, R8::D)),      // 0xA2
+            0b1010_0011 => Self::BitResetR8((4, R8::E)),      // 0xA3
+            0b1010_0100 => Self::BitResetR8((4, R8::H)),      // 0xA4
+            0b1010_0101 => Self::BitResetR8((4, R8::L)),      // 0xA5
+            0b1010_0110 => Self::BitResetR8((4, R8::HL)),     // 0xA6
+            0b1010_0111 => Self::BitResetR8((4, R8::A)),      // 0xA7
+            0b1010_1000 => Self::BitResetR8((5, R8::B)),      // 0xA8
+            0b1010_1001 => Self::BitResetR8((5, R8::C)),      // 0xA9
+            0b1010_1010 => Self::BitResetR8((5, R8::D)),      // 0xAA
+            0b1010_1011 => Self::BitResetR8((5, R8::E)),      // 0xAB
+            0b1010_1100 => Self::BitResetR8((5, R8::H)),      // 0xAC
+            0b1010_1101 => Self::BitResetR8((5, R8::L)),      // 0xAD
+            0b1010_1110 => Self::BitResetR8((5, R8::HL)),     // 0xAE
+            0b1010_1111 => Self::BitResetR8((5, R8::A)),      // 0xAF
+            0b1011_0000 => Self::BitResetR8((6, R8::B)),      // 0xB0
+            0b1011_0001 => Self::BitResetR8((6, R8::C)),      // 0xB1
+            0b1011_0010 => Self::BitResetR8((6, R8::D)),      // 0xB2
+            0b1011_0011 => Self::BitResetR8((6, R8::E)),      // 0xB3
+            0b1011_0100 => Self::BitResetR8((6, R8::H)),      // 0xB4
+            0b1011_0101 => Self::BitResetR8((6, R8::L)),      // 0xB5
+            0b1011_0110 => Self::BitResetR8((6, R8::HL)),     // 0xB6
+            0b1011_0111 => Self::BitResetR8((6, R8::A)),      // 0xB7
+            0b1011_1000 => Self::BitResetR8((7, R8::B)),      // 0xB8
+            0b1011_1001 => Self::BitResetR8((7, R8::C)),      // 0xB9
+            0b1011_1010 => Self::BitResetR8((7, R8::D)),      // 0xBA
+            0b1011_1011 => Self::BitResetR8((7, R8::E)),      // 0xBB
+            0b1011_1100 => Self::BitResetR8((7, R8::H)),      // 0xBC
+            0b1011_1101 => Self::BitResetR8((7, R8::L)),      // 0xBD
+            0b1011_1110 => Self::BitResetR8((7, R8::HL)),     // 0xBE
+            0b1011_1111 => Self::BitResetR8((7, R8::A)),      // 0xBF
+            0b1100_0000 => Self::BitSetR8((0, R8::B)),        // 0xC0
+            0b1100_0001 => Self::BitSetR8((0, R8::C)),        // 0xC1
+            0b1100_0010 => Self::BitSetR8((0, R8::D)),        // 0xC2
+            0b1100_0011 => Self::BitSetR8((0, R8::E)),        // 0xC3
+            0b1100_0100 => Self::BitSetR8((0, R8::H)),        // 0xC4
+            0b1100_0101 => Self::BitSetR8((0, R8::L)),        // 0xC5
+            0b1100_0110 => Self::BitSetR8((0, R8::HL)),       // 0xC6
+            0b1100_0111 => Self::BitSetR8((0, R8::A)),        // 0xC7
+            0b1100_1000 => Self::BitSetR8((1, R8::B)),        // 0xC8
+            0b1100_1001 => Self::BitSetR8((1, R8::C)),        // 0xC9
+            0b1100_1010 => Self::BitSetR8((1, R8::D)),        // 0xCA
+            0b1100_1011 => Self::BitSetR8((1, R8::E)),        // 0xCB
+            0b1100_1100 => Self::BitSetR8((1, R8::H)),        // 0xCC
+            0b1100_1101 => Self::BitSetR8((1, R8::L)),        // 0xCD
+            0b1100_1110 => Self::BitSetR8((1, R8::HL)),       // 0xCE
+            0b1100_1111 => Self::BitSetR8((1, R8::A)),        // 0xCF
+            0b1101_0000 => Self::BitSetR8((2, R8::B)),        // 0xD0
+            0b1101_0001 => Self::BitSetR8((2, R8::C)),        // 0xD1
+            0b1101_0010 => Self::BitSetR8((2, R8::D)),        // 0xD2
+            0b1101_0011 => Self::BitSetR8((2, R8::E)),        // 0xD3
+            0b1101_0100 => Self::BitSetR8((2, R8::H)),        // 0xD4
+            0b1101_0101 => Self::BitSetR8((2, R8::L)),        // 0xD5
+            0b1101_0110 => Self::BitSetR8((2, R8::HL)),       // 0xD6
+            0b1101_0111 => Self::BitSetR8((2, R8::A)),        // 0xD7
+            0b1101_1000 => Self::BitSetR8((3, R8::B)),        // 0xD8
+            0b1101_1001 => Self::BitSetR8((3, R8::C)),        // 0xD9
+            0b1101_1010 => Self::BitSetR8((3, R8::D)),        // 0xDA
+            0b1101_1011 => Self::BitSetR8((3, R8::E)),        // 0xDB
+            0b1101_1100 => Self::BitSetR8((3, R8::H)),        // 0xDC
+            0b1101_1101 => Self::BitSetR8((3, R8::L)),        // 0xDD
+            0b1101_1110 => Self::BitSetR8((3, R8::HL)),       // 0xDE
+            0b1101_1111 => Self::BitSetR8((3, R8::A)),        // 0xDF
+            0b1110_0000 => Self::BitSetR8((4, R8::B)),        // 0xE0
+            0b1110_0001 => Self::BitSetR8((4, R8::C)),        // 0xE1
+            0b1110_0010 => Self::BitSetR8((4, R8::D)),        // 0xE2
+            0b1110_0011 => Self::BitSetR8((4, R8::E)),        // 0xE3
+            0b1110_0100 => Self::BitSetR8((4, R8::H)),        // 0xE4
+            0b1110_0101 => Self::BitSetR8((4, R8::L)),        // 0xE5
+            0b1110_0110 => Self::BitSetR8((4, R8::HL)),       // 0xE6
+            0b1110_0111 => Self::BitSetR8((4, R8::A)),        // 0xE7
+            0b1110_1000 => Self::BitSetR8((5, R8::B)),        // 0xE8
+            0b1110_1001 => Self::BitSetR8((5, R8::C)),        // 0xE9
+            0b1110_1010 => Self::BitSetR8((5, R8::D)),        // 0xEA
+            0b1110_1011 => Self::BitSetR8((5, R8::E)),        // 0xEB
+            0b1110_1100 => Self::BitSetR8((5, R8::H)),        // 0xEC
+            0b1110_1101 => Self::BitSetR8((5, R8::L)),        // 0xED
+            0b1110_1110 => Self::BitSetR8((5, R8::HL)),       // 0xEE
+            0b1110_1111 => Self::BitSetR8((5, R8::A)),        // 0xEF
+            0b1111_0000 => Self::BitSetR8((6, R8::B)),        // 0xF0
+            0b1111_0001 => Self::BitSetR8((6, R8::C)),        // 0xF1
+            0b1111_0010 => Self::BitSetR8((6, R8::D)),        // 0xF2
+            0b1111_0011 => Self::BitSetR8((6, R8::E)),        // 0xF3
+            0b1111_0100 => Self::BitSetR8((6, R8::H)),        // 0xF4
+            0b1111_0101 => Self::BitSetR8((6, R8::L)),        // 0xF5
+            0b1111_0110 => Self::BitSetR8((6, R8::HL)),       // 0xF6
+            0b1111_0111 => Self::BitSetR8((6, R8::A)),        // 0xF7
+            0b1111_1000 => Self::BitSetR8((7, R8::B)),        // 0xF8
+            0b1111_1001 => Self::BitSetR8((7, R8::C)),        // 0xF9
+            0b1111_1010 => Self::BitSetR8((7, R8::D)),        // 0xFA
+            0b1111_1011 => Self::BitSetR8((7, R8::E)),        // 0xFB
+            0b1111_1100 => Self::BitSetR8((7, R8::H)),        // 0xFC
+            0b1111_1101 => Self::BitSetR8((7, R8::L)),        // 0xFD
+            0b1111_1110 => Self::BitSetR8((7, R8::HL)),       // 0xFE
+            0b1111_1111 => Self::BitSetR8((7, R8::A)),        // 0xFF
+            _ => panic!("Illegal prefixed instruction byte: {:02X}", byte),
         }
     }
 
@@ -442,8 +723,8 @@ impl Instruction {
             | Self::ComplementCarryFlag
             | Self::RotateLeftA
             | Self::RotateRightA
-            | Self::RotateLeftCarryA
-            | Self::RotateRightCarryA
+            | Self::RotateLeftCircularA
+            | Self::RotateRightCircularA
             | Self::SetCarryFlag
             | Self::DAA
             | Self::DisableInterrupts
@@ -478,7 +759,18 @@ impl Instruction {
             | Self::LoadHighAImm8
             | Self::LoadHighImm8A
             | Self::AddSpImm8
-            | Self::LoadHlSpImm8 => 2,
+            | Self::LoadHlSpImm8
+            | Self::BitCheckR8(_)
+            | Self::BitResetR8(_)
+            | Self::BitSetR8(_)
+            | Self::RotateLeftR8(_)
+            | Self::RotateLeftCircularR8(_)
+            | Self::RotateRightR8(_)
+            | Self::RotateRightCircularR8(_)
+            | Self::ShiftLeftR8(_)
+            | Self::ShiftRightR8(_)
+            | Self::SwapR8(_)
+            | Self::ShiftRightLogicallyR8(_) => 2,
             Self::JpImm16
             | Self::JpCondImm16(_)
             | Self::LoadR16Imm16(_)
@@ -581,8 +873,8 @@ impl Instruction {
             Self::ReturnEnableInterrupts => "RETI".into(),
             Self::RotateLeftA => "RLA".into(),
             Self::RotateRightA => "RRA".into(),
-            Self::RotateLeftCarryA => "RLCA".into(),
-            Self::RotateRightCarryA => "RRCA".into(),
+            Self::RotateLeftCircularA => "RLCA".into(),
+            Self::RotateRightCircularA => "RRCA".into(),
             Self::SetCarryFlag => "SCF".into(),
             Self::SubR8(r8) => format!("SUB A, {r8}"),
             Self::SubImm8 => format!("SUB A, 0x{:02X}", lsb),
@@ -590,6 +882,17 @@ impl Instruction {
             Self::SubCarryImm8 => format!("SBC A, 0x{:02X}", lsb),
             Self::XorR8(r8) => format!("XOR A, {r8}"),
             Self::XorImm8 => format!("XOR A, 0x{:02X}", lsb),
+            Self::BitCheckR8((u8, r8)) => format!("BIT {u8}, {r8}"),
+            Self::BitResetR8((u8, r8)) => format!("RES {u8}, {r8}"),
+            Self::BitSetR8((u8, r8)) => format!("SET {u8}, {r8}"),
+            Self::RotateLeftR8(r8) => format!("RL {r8}"),
+            Self::RotateLeftCircularR8(r8) => format!("RLC {r8}"),
+            Self::RotateRightR8(r8) => format!("RR {r8}"),
+            Self::RotateRightCircularR8(r8) => format!("RRC {r8}"),
+            Self::ShiftLeftR8(r8) => format!("SLA {r8}"),
+            Self::ShiftRightR8(r8) => format!("SRA {r8}"),
+            Self::SwapR8(r8) => format!("SWAP {r8}"),
+            Self::ShiftRightLogicallyR8(r8) => format!("SRL {r8}"),
         }
     }
 
@@ -713,8 +1016,8 @@ impl Instruction {
             }
             Self::RotateLeftA => "Rotate register A left THROUGH the carry flag".into(),
             Self::RotateRightA => "Rotate register A right THROUGH the carry flag".into(),
-            Self::RotateLeftCarryA => "Rotate register A left, update carry flag".into(),
-            Self::RotateRightCarryA => "Rotate register A right, update carry flag".into(),
+            Self::RotateLeftCircularA => "Rotate register A left, update carry flag".into(),
+            Self::RotateRightCircularA => "Rotate register A right, update carry flag".into(),
             Self::SetCarryFlag => "Set carry flag".into(),
             Self::SubR8(r8) => format!("Subtract value in register {r8} from register A"),
             Self::SubImm8 => format!("Subtract 0x{:02X} from register A", lsb),
@@ -724,6 +1027,17 @@ impl Instruction {
             Self::SubCarryImm8 => format!("Subtract 0x{:02X} (and the current carry) from register A", lsb),
             Self::XorR8(r8) => format!("Bitwise XOR value in register {r8} to register A"),
             Self::XorImm8 => format!("Bitwise XOR 0x{:02X} to register A", lsb),
+            Self::BitCheckR8((u8, r8)) => format!("Check bit at index {u8} of register {r8} and set zero flag if its 0"),
+            Self::BitResetR8((u8, r8)) => format!("Reset bit at index {u8} of register {r8}"),
+            Self::BitSetR8((u8, r8)) => format!("Set bit at index {u8} of register {r8}"),
+            Self::RotateLeftR8(r8) => format!("Rotate register {r8} left THROUGH the carry flag"),
+            Self::RotateLeftCircularR8(r8) => format!("Rotate register {r8} left carry, update carry flag"),
+            Self::RotateRightR8(r8) => format!("Rotate register {r8} right THROUGH the carry flag"),
+            Self::RotateRightCircularR8(r8) => format!("Rotate register {r8} right, update carry flag"),
+            Self::ShiftLeftR8(r8) => format!("Shift register {r8} left (fill up with 0)"),
+            Self::ShiftRightR8(r8) => format!("Shift register {r8} right (persist leftmost bit)"),
+            Self::SwapR8(r8) => format!("Swap upper and lower 4 bits in register {r8}"),
+            Self::ShiftRightLogicallyR8(r8) => format!("Shift register {r8} right (fill up with 0)"),
         }
     }
 }
