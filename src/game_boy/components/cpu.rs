@@ -5,7 +5,7 @@ use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
 use crate::game_boy::components::mmu::{IF_ADDRESS, MMU};
 use crate::helpers::bit_operations::*;
 use crate::instructions::Instruction;
-use log::info;
+use log::debug;
 use registers::CPURegisters;
 use serde::{Deserialize, Serialize};
 
@@ -346,7 +346,7 @@ impl CPU {
 
     pub fn call(&mut self, mmu: &mut MMU) -> (u16, u8) {
         let func_address = self.read_next_imm16(mmu);
-        self.push_u16(self.get_pc(), mmu);
+        self.push_u16(self.get_pc().wrapping_add(3), mmu);
         (func_address, 6)
     }
 
@@ -682,14 +682,14 @@ impl CPU {
 
     pub fn return_from_func(&mut self, mmu: &MMU) -> (u16, u8) {
         let return_to_pc = self.pop_u16(mmu);
-        self.instruction_result(return_to_pc, 4)
+        (return_to_pc, 4)
     }
 
     pub fn return_from_func_cond(&mut self, condition: JumpCondition, mmu: &MMU) -> (u16, u8) {
         let should_jump = self.check_jump_condition(condition);
         if should_jump {
             let (new_pc, _) = self.return_from_func(mmu);
-            self.instruction_result(new_pc, 5)
+            (new_pc, 5)
         } else {
             self.instruction_result(1, 2)
         }
@@ -997,11 +997,11 @@ impl CPU {
     fn log_instruction_execute(&self, instruction: &Instruction, instruction_byte: u8, mmu: &MMU) {
         if log::log_enabled!(log::Level::Info) {
             let (next_lsb, next_msb) = deconstruct_u16(self.read_next_imm16(mmu));
-            info!(
+            debug!(
                 "PC(0x{:04X}) [0x{:02X}]: {}",
                 self.get_pc(),
                 instruction_byte,
-                instruction.parse_description(next_lsb, next_msb)
+                instruction.parse_clear_text(next_lsb, next_msb)
             );
         }
     }

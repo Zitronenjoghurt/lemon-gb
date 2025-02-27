@@ -830,8 +830,8 @@ impl Instruction {
             Self::AddSpImm8 => format!("ADD SP, 0x{:02X}", lsb as i8),
             Self::AndR8(r8) => format!("AND A, {r8}"),
             Self::AndImm8 => format!("AND A, 0x{:02X}", lsb),
-            Self::Call => format!("CALL 0x{:02X}{:02X}", lsb, msb),
-            Self::CallCondition(cond) => format!("CALL {cond}, 0x{:02X}{:02X}", lsb, msb),
+            Self::Call => format!("CALL 0x{:02X}{:02X}", msb, lsb),
+            Self::CallCondition(cond) => format!("CALL {cond}, 0x{:02X}{:02X}", msb, lsb),
             Self::CompareR8(r8) => format!("CP A, {r8}"),
             Self::CompareImm8 => format!("CP A, 0x{:02X}", lsb),
             Self::ComplementA => "CPL".into(),
@@ -852,7 +852,7 @@ impl Instruction {
             Self::LoadAR16(r16_mem) => format!("LD A, {r16_mem}"),
             Self::LoadR16A(r16_mem) => format!("LD {r16_mem}, A"),
             Self::LoadR16Imm16(r16) => format!("LD {r16}, 0x{:02X}{:02X}", msb, lsb),
-            Self::LoadR8Imm8(r8) => format!("LD {r8}, 0x{:02X}", msb),
+            Self::LoadR8Imm8(r8) => format!("LD {r8}, 0x{:02X}", lsb),
             Self::LoadR8R8((target, source)) => format!("LD {target}, {source}"),
             Self::LoadHighAC => "LDH A, [0xFF00+C]".into(),
             Self::LoadHighCA => "LDH [0xFF00+C], A".into(),
@@ -967,7 +967,7 @@ impl Instruction {
                 format!("Load 0x{:02X}{:02X} into register {r16}", msb, lsb)
             }
             Self::LoadR8Imm8(r8) => {
-                format!("Load 0x{:02X} into register {r8}", msb)
+                format!("Load 0x{:02X} into register {r8}", lsb)
             }
             Self::LoadR8R8((target, source)) => {
                 format!("Load value in register {source} into register {target}")

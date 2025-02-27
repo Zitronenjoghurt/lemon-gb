@@ -41,6 +41,10 @@ impl GameBoy {
         frame_finished
     }
 
+    pub fn finish_frame(&mut self) {
+        while !self.step() {}
+    }
+
     fn write_interrupts(&mut self, timer: bool, vblank: bool, stat: bool) {
         let mut i_flag = self.mmu.read(IF_ADDRESS);
         if timer {

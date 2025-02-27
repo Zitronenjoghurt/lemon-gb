@@ -502,7 +502,7 @@ fn test_call() {
 
     assert_eq!(m, 6);
     assert_eq!(cpu.get_pc(), 0xCCFF);
-    assert_eq!(mmu.read_16(0xFFFC), 0x11FD);
+    assert_eq!(mmu.read_16(0xFFFC), 0x1200);
 }
 
 /// Call cond

@@ -1,10 +1,13 @@
 use crate::game_boy::components::mmu::{
-    DMA_ADDRESS, LCDC_ADDRESS, LYC_ADDRESS, LY_ADDRESS, MMU, STAT_ADDRESS,
+    BGP_ADDRESS, DMA_ADDRESS, LCDC_ADDRESS, LYC_ADDRESS, LY_ADDRESS, MMU, SCX_ADDRESS, SCY_ADDRESS,
+    STAT_ADDRESS,
 };
+use crate::game_boy::components::ppu::background_palette::BackgroundPalette;
 use crate::game_boy::components::ppu::lcd_control::LCDControl;
 use crate::game_boy::components::ppu::lcd_status::LCDStatus;
 use crate::game_boy::components::ppu::mode::PPUMode;
 
+mod background_palette;
 mod lcd_control;
 mod lcd_status;
 mod mode;
@@ -15,10 +18,10 @@ pub const SCREEN_HEIGHT: usize = 144;
 /// Using the Game Boy Pocket color scheme
 /// https://en.wikipedia.org/wiki/List_of_video_game_console_palettes
 const COLOR_SCHEME: [[u8; 4]; 4] = [
-    [0x18, 0x18, 0x18, 0xFF],
-    [0x4A, 0x51, 0x38, 0xFF],
-    [0x8C, 0x92, 0x6B, 0xFF],
     [0xC5, 0xCA, 0xA4, 0xFF],
+    [0x8C, 0x92, 0x6B, 0xFF],
+    [0x4A, 0x51, 0x38, 0xFF],
+    [0x18, 0x18, 0x18, 0xFF],
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +52,8 @@ impl PPU {
         self.vblank_interrupt = false;
         self.stat_interrupt = false;
         self.frame_complete = false;
+
+        self.handle_dma(mmu);
 
         self.mode_clock = self.mode_clock.wrapping_add(m_cycles as u32 * 4);
         self.execute_mode(mmu);
@@ -159,7 +164,37 @@ impl PPU {
         }
     }
 
-    fn render_background(&mut self, mmu: &mut MMU) {}
+    fn render_background(&mut self, mmu: &mut MMU) {
+        let bg_palette = self.get_background_palette(mmu);
+        let lcd_control = self.get_lcdc(mmu);
+        let scroll_x = mmu.read(SCX_ADDRESS);
+        let scroll_y = mmu.read(SCY_ADDRESS);
+
+        let y_pos = (scroll_y as u16 + self.current_line as u16) & 255;
+        let tile_y = y_pos / 8;
+
+        for x in 0..SCREEN_WIDTH as u16 {
+            let x_pos = (scroll_x as u16 + x) & 255;
+            let tile_x = x_pos / 8;
+
+            let tile_address = lcd_control.get_tile_address(tile_x, tile_y);
+            let tile_id = mmu.read(tile_address);
+
+            let tile_line_data_address = lcd_control.get_tile_line_data_address(tile_id, y_pos);
+
+            let low_byte = mmu.read(tile_line_data_address);
+            let high_byte = mmu.read(tile_line_data_address + 1);
+
+            let bit_index = 7 - (x_pos % 8);
+            let color_index = (((high_byte >> bit_index) & 1) << 1) | ((low_byte >> bit_index) & 1);
+
+            let color = bg_palette.get_color_by_id(color_index);
+            let buffer_index = self.get_frame_buffer_index(x as usize);
+
+            let color_values = &COLOR_SCHEME[color as usize];
+            self.frame_buffer[buffer_index..buffer_index + 4].copy_from_slice(color_values);
+        }
+    }
 }
 
 /// Memory Access
@@ -170,6 +205,10 @@ impl PPU {
 
     fn get_stat(&self, mmu: &MMU) -> LCDStatus {
         mmu.read(STAT_ADDRESS).into()
+    }
+
+    fn get_background_palette(&self, mmu: &MMU) -> BackgroundPalette {
+        mmu.read(BGP_ADDRESS).into()
     }
 
     /// Update STAT and other important memory registers

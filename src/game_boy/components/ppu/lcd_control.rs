@@ -20,6 +20,36 @@ pub struct LCDControl {
     pub bg_window_enable: bool,
 }
 
+impl LCDControl {
+    pub fn get_bg_tilemap_address(&self) -> u16 {
+        if self.bg_tilemap {
+            0x9C00
+        } else {
+            0x9800
+        }
+    }
+
+    pub fn get_tile_address(&self, tile_x: u16, tile_y: u16) -> u16 {
+        self.get_bg_tilemap_address() + tile_x + tile_y * 32
+    }
+
+    pub fn get_tile_line_data_address(&self, tile_id: u8, y_pos: u16) -> u16 {
+        let tile_line = (y_pos % 8) * 2;
+
+        let tile_data_offset = if self.bg_window_tiles {
+            tile_id as u16 * 16
+        } else {
+            (((tile_id as i8) as i16) + 128) as u16 * 16
+        };
+
+        if self.bg_window_tiles {
+            0x8000 + tile_data_offset + tile_line
+        } else {
+            0x8800 + tile_data_offset + tile_line
+        }
+    }
+}
+
 impl From<u8> for LCDControl {
     fn from(value: u8) -> Self {
         let bg_window_enable = (value & 0b0000_0001) != 0;
