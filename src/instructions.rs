@@ -210,7 +210,7 @@ impl Instruction {
             0b0000_1101 => Ok(Self::DecR8(R8::C)),                        // 0x0D
             0b0000_1110 => Ok(Self::LoadR8Imm8(R8::C)),                   // 0x0E
             0b0000_1111 => Ok(Self::RotateRightCircularA),                // 0x0F
-            0b0001_0000 => Ok(Self::Halt),                                // 0x10 ToDo: STOP
+            0b0001_0000 => Ok(Self::Nop),                                 // 0x10 ToDo: STOP
             0b0001_0001 => Ok(Self::LoadR16Imm16(R16::DE)),               // 0x11
             0b0001_0010 => Ok(Self::LoadR16A(R16Mem::DE)),                // 0x12
             0b0001_0011 => Ok(Self::IncR16(R16::DE)),                     // 0x13

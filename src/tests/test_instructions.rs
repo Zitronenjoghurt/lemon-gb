@@ -3,7 +3,7 @@ use crate::game_boy::components::cpu::registers::builder::CPURegistersBuilderTra
 use crate::game_boy::components::cpu::registers::CpuRegistersAccessTrait;
 use crate::game_boy::components::cpu::{CPU, PREFIX_INSTRUCTION_BYTE};
 use crate::game_boy::components::mmu::MMU;
-use crate::helpers::bit_operations::construct_u16;
+use crate::helpers::bit_operations::{construct_u16, deconstruct_u16};
 use rstest::rstest;
 
 /// ADD register (B, C, D, E, H, L)
@@ -992,20 +992,12 @@ fn test_ld_r16_a(#[case] opcode: u8, #[case] address: u16, #[case] value: u8) {
 
 /// LOAD imm16 SP (0x08)
 #[rstest]
-#[case::basic_load(0xFFFE, 0x37, 0x13, 0x00, 0xC0)]
-fn test_ld_imm16_sp(
-    #[case] sp: u16,
-    #[case] value_lsb: u8,
-    #[case] value_msb: u8,
-    #[case] addr_lsb: u8,
-    #[case] addr_msb: u8,
-) {
+#[case::basic_load(0xFFFE, 0x00, 0xC0)]
+fn test_ld_imm16_sp(#[case] sp: u16, #[case] addr_lsb: u8, #[case] addr_msb: u8) {
     let mut mmu = MMU::builder()
         .rom(0, 0x08)
         .rom(1, addr_lsb)
         .rom(2, addr_msb)
-        .write(sp, value_lsb)
-        .write(sp + 1, value_msb)
         .build();
     let mut cpu = CPU::builder().sp(sp).build();
     let m = cpu.step(&mut mmu);
@@ -1014,8 +1006,9 @@ fn test_ld_imm16_sp(
     assert_eq!(cpu.get_pc(), 3);
 
     let address = construct_u16(addr_lsb, addr_msb);
-    assert_eq!(mmu.read(address), value_lsb);
-    assert_eq!(mmu.read(address + 1), value_msb);
+    let (sp_lsb, sp_msb) = deconstruct_u16(cpu.get_sp());
+    assert_eq!(mmu.read(address), sp_lsb);
+    assert_eq!(mmu.read(address + 1), sp_msb);
 }
 
 /// LOAD r8 imm8 (except HL)

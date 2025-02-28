@@ -572,10 +572,9 @@ impl CPU {
 
     pub fn load_imm16_sp(&mut self, mmu: &mut MMU) -> (u16, u8) {
         let address = self.read_next_imm16(mmu);
-        let value_lsb = mmu.read(self.get_sp());
-        let value_msb = mmu.read(self.get_sp().wrapping_add(1));
-        mmu.write(address, value_lsb);
-        mmu.write(address.wrapping_add(1), value_msb);
+        let (sp_lsb, sp_msb) = deconstruct_u16(self.get_sp());
+        mmu.write(address, sp_lsb);
+        mmu.write(address.wrapping_add(1), sp_msb);
 
         self.instruction_result(3, 5)
     }
@@ -676,7 +675,7 @@ impl CPU {
 
     pub fn restart_vector(&mut self, address_lsb: u8, mmu: &mut MMU) -> (u16, u8) {
         let address = construct_u16(address_lsb, 0x00);
-        self.push_u16(self.get_pc(), mmu);
+        self.push_u16(self.get_pc().wrapping_add(1), mmu);
         (address, 4)
     }
 

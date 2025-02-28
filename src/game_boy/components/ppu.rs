@@ -213,7 +213,6 @@ impl PPU {
 
     /// Update STAT and other important memory registers
     fn update_memory_state(&mut self, mmu: &mut MMU) {
-        // ToDo: Write current line, update other stuff
         let mut current_stat = self.get_stat(mmu);
         current_stat.ppu_mode = self.mode;
 
