@@ -6,6 +6,7 @@ use crate::game_boy::components::ppu::PPU;
 use crate::game_boy::components::timer::Timer;
 use crate::game_boy::save_state::GameBoySaveState;
 use crate::helpers::bit_operations::set_bit_u8;
+use image::{ImageBuffer, Rgba};
 use std::error::Error;
 
 pub mod components;
@@ -79,6 +80,13 @@ impl GameBoy {
 
     pub fn get_frame_buffer(&self) -> &[u8] {
         self.ppu.get_frame_buffer()
+    }
+}
+
+/// Miscellaneous
+impl GameBoy {
+    pub fn render_image(&self, scale_factor: f32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        self.ppu.render_image(scale_factor)
     }
 }
 

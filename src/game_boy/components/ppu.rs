@@ -6,6 +6,8 @@ use crate::game_boy::components::ppu::background_palette::BackgroundPalette;
 use crate::game_boy::components::ppu::lcd_control::LCDControl;
 use crate::game_boy::components::ppu::lcd_status::LCDStatus;
 use crate::game_boy::components::ppu::mode::PPUMode;
+use image::imageops::Nearest;
+use image::{imageops, ImageBuffer, Rgba};
 
 mod background_palette;
 mod lcd_control;
@@ -248,6 +250,23 @@ impl PPU {
 
         mmu.write(STAT_ADDRESS, current_stat.into());
         mmu.write(LY_ADDRESS, self.current_line);
+    }
+}
+
+/// Miscellaneous
+impl PPU {
+    pub fn render_image(&self, scale_factor: f32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        let image = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(
+            SCREEN_WIDTH as u32,
+            SCREEN_HEIGHT as u32,
+            self.frame_buffer.to_vec(),
+        )
+        .unwrap();
+
+        let scaled_width = (SCREEN_WIDTH as f32 * scale_factor) as u32;
+        let scaled_height = (SCREEN_HEIGHT as f32 * scale_factor) as u32;
+
+        imageops::resize(&image, scaled_width, scaled_height, Nearest)
     }
 }
 

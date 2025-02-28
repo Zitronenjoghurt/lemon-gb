@@ -29,8 +29,9 @@ jobs:
         if: steps.cache-tarpaulin.outputs.cache-hit != 'true'
         run: cargo install cargo-tarpaulin
 
-      - name: Run tests
-        run: cargo test --no-default-features
+      # Don't need to run tests twice
+      #- name: Run tests
+      #  run: cargo test --no-default-features
 
       - name: Generate code coverage
         run: cargo tarpaulin --verbose --no-default-features --workspace --timeout 120 --out Xml

@@ -26,15 +26,20 @@ The sources I have used to create this emulator.
 
 WORK IN PROGRESS, not launchable yet
 
-### Components
+- Currently only the title screen of two games render properly
+- No input, no sound, no sprite/object and window rendering
+- Major visual glitches in the vast majority of games
+
+## Components
 
 - ✅ CPU (501/501 Instructions, except STOP)
+    - Passing Blarggs cpu tests
 - ✅ Timer
 - 🚧 MMU (see memory banking)
 - 🚧 PPU
 - ❌ APU
 
-### Memory Banking
+## Memory Banking
 
 - ✅ No MBC
 - ✅ MBC1
@@ -44,3 +49,15 @@ WORK IN PROGRESS, not launchable yet
 - ❌ MBC6
 - ❌ MBC7
 - ❌ ... (others)
+
+## Examples
+
+### Donkey Kong Land (Title Screen)
+
+Only background rendering
+![Donkey Kong Land (Title Screen)](public/dk_bg_rendering.png)
+
+### Dr. Mario (Title Screen)
+
+Only background rendering
+![dr_mario_bg_rendering.png](public/dr_mario_bg_rendering.png)

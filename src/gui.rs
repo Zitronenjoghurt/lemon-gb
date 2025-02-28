@@ -40,7 +40,7 @@ pub fn run(game_boy: &mut GameBoy) {
 
     const FRAME_DURATION: Duration = Duration::from_nanos((1_000_000_000.0 / GAME_BOY_FPS) as u64);
 
-    let res = event_loop.run(|event, elwt| {
+    let _ = event_loop.run(|event, elwt| {
         if let Event::WindowEvent {
             event: WindowEvent::RedrawRequested,
             ..
